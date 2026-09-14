@@ -484,7 +484,7 @@ const localeMessages = {
   la: {
     language: "Lingua",
     open: "Aperi MKAR",
-    add: "Adde files",
+    add: "Adice fasciculos",
     clear: "Vacua",
     settings: "Optiones generales",
     export: "Exporta MKAR",
@@ -494,7 +494,7 @@ const localeMessages = {
     archiveName: "Nomen archivii",
     search: "Quaere hoc directorium",
     noArchive: "Nullum archivum apertum",
-    drop: "Aperi MKAR aut depone files hic.",
+    drop: "Aperi MKAR aut mitte fasciculos hic.",
     name: "Nomen",
     mode: "Modus",
     back: "Redi",
@@ -506,49 +506,49 @@ const localeMessages = {
     off: "Clausum",
     on: "Apertum",
     useKey: "Utere clave",
-    packingKey: "Clavis sarcinae",
+    packingKey: "Clavis sarcinandi",
     selectKey: "Selige clavem",
-    noKeys: "Nullae claves",
+    noKeys: "Nullae claves paratae",
     cancel: "Abroga",
     save: "Serva",
     close: "Claude",
     unsaved: "Mutationes non servatae",
     discard: "Abice mutationes",
     confirmDiscard: "Mutationes non servatae sunt. Pergere et abicere?",
-    packingKeys: "Claves sarcinae",
+    packingKeys: "Claves sarcinandi",
     keyIndex: "Index clavis",
     password: "Tessera",
     confirm: "Confirma",
     addShort: "Adde",
-    noPackingKeys: "Nullae claves sarcinae.",
+    noPackingKeys: "Nullae claves sarcinandi paratae.",
     globalDefaults: "Praedefinitiones generales",
-    exportSettings: "Optiones exportationis",
+    exportSettings: "Optiones exportandi",
     enableEncryption: "Activa encryptionem",
     defaultPackingKey: "Clavis praedefinita",
     noDefaultKey: "Nulla clavis praedefinita",
-    encryptDirectories: "Encrypte indices directoriorum",
-    compressPayloads: "Comprime contenta",
+    encryptDirectories: "Encrypta indicia viarum",
+    compressPayloads: "Comprime contenta fasciculorum",
     tarVariant: "Varietas TAR",
-    unlockKey: "Aperi clavem {index}",
-    encryptedPart: "Haec pars archivii clavi {index} encrypta est.",
+    unlockKey: "Resera clavem {index}",
+    encryptedPart: "Haec pars archivii clave {index} encrypta est.",
     incorrectPassword: "Tessera falsa.",
-    unlock: "Aperi",
+    unlock: "Resera",
     ready: "Paratum",
     loading: "Oneratur",
-    unavailable: "Indisponibile",
+    unavailable: "Non praesto",
     item: "elementum",
     items: "elementa",
-    noMatchingFiles: "Nulla documenta congruentia",
+    noMatchingFiles: "Nulli fasciculi congruentes",
     folderEmpty: "Hoc directorium vacuum est",
     archiveActions: "Actiones archivii",
     exportFormat: "Forma exportationis",
-    selectAll: "Selige omnia in directorio",
+    selectAll: "Selige omnia in hoc directorio",
     selectEntry: "Selige {name}",
     archiveNameLabel: "Nomen archivii",
     encryptionSettingFor: "Encryptio {name}",
-    packingKeyFor: "Clavis sarcinae {name}",
+    packingKeyFor: "Clavis sarcinandi {name}",
     compressionSettingFor: "Compressio {name}",
-    addFiles: "Adde files",
+    addFiles: "Adice fasciculos",
     importMkar: "Importa MKAR",
     backParent: "Redi ad directorium superius",
     entrySettingsFor: "Optiones: {name}",
@@ -556,43 +556,43 @@ const localeMessages = {
     downloadEntry: "Depone {name}",
     settingsLabel: "Optiones",
     deleteLabel: "Dele",
-    encryptionOff: "Encryptio clausa",
-    encryptionOn: "Encryptio aperta",
-    compressionOff: "Compressio clausa",
-    compressionOn: "Compressio aperta",
+    encryptionOff: "Encryptio omissa",
+    encryptionOn: "Encryptio activa",
+    compressionOff: "Compressio omissa",
+    compressionOn: "Compressio activa",
     encrypted: "Encryptum",
     readingIndex: "Index archivii legitur",
     readingEntry: "Elementum {completed} ex {total} legitur",
     exportingEntries: "Elementa {completed} ex {total} exportantur",
-    exportedAs: "{name} ut {format} exportatum",
+    exportedAs: "{name} in forma {format} exportatum",
     downloaded: "{name} depositum",
     exportCancelled: "Exportatio abrogata",
     entriesImported: "{count} elementa importata",
-    filesAdded: "{count} documenta addita",
+    filesAdded: "{count} fasciculi additi",
     deleted: "{name} deletum",
-    workspaceCleared: "Spatium operis vacuatum",
+    workspaceCleared: "Spatium operandi vacuatum",
     opening: "{name} aperitur",
     unlocking: "{name} reseratur",
     opened: "{name} apertum",
     operationFailed: "Operatio MKAR defecit",
     invalidArchive: "Archivum MKAR invalidum",
     passwordRequired: "Archivum MKAR encryptum tesseram requirit",
-    limitExceeded: "Archivum MKAR limites securitatis navigatoris excedit",
-    unsupportedFeature: "Hoc archivum MKAR rem non sustentatam utitur",
-    wasmInitFailed: "WebAssembly MKAR initializari non potest: {message}",
+    limitExceeded: "Archivum MKAR fines securitatis excedit",
+    unsupportedFeature: "Hoc archivum MKAR facultate non sustentata utitur",
+    wasmInitFailed: "WebAssembly MKAR parari non potest: {message}",
     couldNotRead: "{path} legi non potest",
     removeKey: "Clavem {index} dele",
-    defaultPackingKeyLabel: "Clavis sarcinae praedefinita",
+    defaultPackingKeyLabel: "Clavis sarcinandi ordinaria",
     keyLabel: "Clavis {index}",
     keyIndexError: "Index clavis integer inter 0 et 4294967295 esse debet.",
-    packingPasswordRequired: "Tesseram sarcinae insere.",
+    packingPasswordRequired: "Tesseram sarcinandi insere.",
     passwordsDoNotMatch: "Tesserae non congruunt.",
     settingsUpdated: "Optiones MKAR renovatae",
     about: "De applicatione",
     aboutProcessing:
-      "MKAR Viewer archiva omnino in navigatro tuo legit, extrahit, comprimit, encryptat atque exportat. Nec fasciculi nec tesserae secretae in rete mittuntur.",
+      "MKAR Viewer archiva legit, extrahit, comprimit, encryptat atque exportat. Nec fasciculi nec tesserae secretae alicubi mittuntur.",
     aboutUpstream:
-      "Auxilium archivii a projecto superiore remkar ({project}) praebetur.",
+      "Auxilium archiviorum a consilio remkar ({project}) praebetur.",
     copyright: "Ius auctoris (C) 2026 Mirekintoc Void",
     aboutClose: "Claude",
   },
@@ -1241,6 +1241,9 @@ const localeMessages = {
     unavailable: "Недоступно",
     item: "элемент",
     items: "элементов",
+    itemOne: "элемент",
+    itemFew: "элемента",
+    itemMany: "элементов",
     noMatchingFiles: "Подходящих файлов нет",
     folderEmpty: "Эта папка пуста",
     archiveActions: "Действия с архивом",
@@ -1303,11 +1306,27 @@ const localeMessages = {
 
 type MessageKey = keyof typeof localeMessages.en;
 const messages: Record<Language, Record<string, string>> = localeMessages;
-function initialLanguage(): Language {
-  const saved = localStorage.getItem("mkar-language") as Language | null;
-  if (saved && saved in messages) return saved;
-  const value = navigator.language.toLowerCase();
-  if (value.startsWith("zh-tw") || value.startsWith("zh-hk")) return "zh-TW";
+const selectionLabels: Record<Language, [string, string]> = {
+  en: ["Select", "Exit selection"],
+  "zh-CN": ["选择", "退出选择"],
+  "zh-TW": ["選取", "結束選取"],
+  ja: ["選択", "選択を終了"],
+  la: ["Selige", "Exit e selectione"],
+  ko: ["선택", "선택 종료"],
+  fr: ["Sélectionner", "Quitter la sélection"],
+  es: ["Seleccionar", "Salir de la selección"],
+  it: ["Seleziona", "Esci dalla selezione"],
+  de: ["Auswählen", "Auswahl beenden"],
+  ru: ["Выбрать", "Выйти из выбора"],
+};
+for (const language of Object.keys(selectionLabels) as Language[]) {
+  [messages[language].enterSelection, messages[language].exitSelection] = selectionLabels[language];
+}
+
+function languageFromLocale(locale: string): Language {
+  const value = locale.toLowerCase().replaceAll("_", "-");
+  if (value === "la" || value.startsWith("la-")) return "la";
+  if (value.startsWith("zh-tw") || value.startsWith("zh-hk") || value.startsWith("zh-mo") || value.startsWith("zh-hant")) return "zh-TW";
   if (value.startsWith("zh")) return "zh-CN";
   if (value.startsWith("ja")) return "ja";
   if (value.startsWith("ko")) return "ko";
@@ -1319,11 +1338,18 @@ function initialLanguage(): Language {
   return "en";
 }
 
+function initialLanguage(): Language {
+  const saved = localStorage.getItem("mkar-language") as Language | null;
+  if (saved && saved in messages) return saved;
+  return languageFromLocale(navigator.language);
+}
+
 const I18nContext = createContext<{
   language: Language;
   setLanguage: (language: Language) => void;
   t: (key: string, vars?: Record<string, string | number>) => string;
-}>({ language: "en", setLanguage: () => undefined, t: (key) => key });
+  tc: (key: string, count: number) => string;
+}>({ language: "en", setLanguage: () => undefined, t: (key) => key, tc: (key) => key });
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(initialLanguage);
@@ -1336,10 +1362,22 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       language,
       setLanguage,
       t: (key: string, vars?: Record<string, string | number>) => {
-        let value = messages[language][key];
+        let value = messages[language][key] ?? messages.en[key] ?? key;
         for (const [name, replacement] of Object.entries(vars ?? {}))
           value = value.replaceAll(`{${name}}`, String(replacement));
         return value;
+      },
+      tc: (key: string, count: number) => {
+        if (key === "item") {
+          if (language === "ru") {
+            const mod10 = count % 10;
+            const mod100 = count % 100;
+            const form = mod10 === 1 && mod100 !== 11 ? "itemOne" : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? "itemFew" : "itemMany";
+            return messages.ru[form];
+          }
+          return count === 1 ? messages[language].item : messages[language].items;
+        }
+        return messages[language][key] ?? messages.en[key] ?? key;
       },
     }),
     [language],

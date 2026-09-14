@@ -21,6 +21,7 @@ import {
   ShieldOff,
   Trash2,
   X,
+  CheckSquare,
 } from "lucide-react";
 import { encodeArchive } from "./archive";
 import {
@@ -143,6 +144,7 @@ function parentPath(path: string) {
 function entryName(path: string) {
   return path.slice(path.lastIndexOf("/") + 1);
 }
+
 
 export function importedArchiveName(fileName: string) {
   return fileName.replace(/\.mkar$/i, "") || "untitled";
@@ -377,9 +379,23 @@ function codecErrorNotice(error: unknown): Notice {
 }
 
 function AppView({ codecLoader = loadMkarCodec }: AppProps) {
-  const { language, setLanguage, t } = useI18n();
+  const { language, setLanguage, t, tc } = useI18n();
   const [entries, setEntries] = useState<FsEntry[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [touchLayout, setTouchLayout] = useState(() =>
+    window.matchMedia?.("(pointer: coarse)").matches ?? false,
+  );
+  const selectionEnabled = !touchLayout || selectionMode;
+  useEffect(() => {
+    const media = window.matchMedia?.("(pointer: coarse)");
+    if (!media) return;
+    const update = () => setTouchLayout(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggered = useRef(false);
   const [currentPath, setCurrentPath] = useState("");
   const [query, setQuery] = useState("");
   const [format, setFormat] = useState<ArchiveFormat>("mkar");
@@ -543,7 +559,7 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
     observer.observe(toolbar);
     update();
     return () => observer.disconnect();
-  }, [language]);
+  }, [language, touchLayout, selectionMode]);
 
   useLayoutEffect(() => {
     const table = tableRef.current;
@@ -1029,6 +1045,37 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
     setQuery("");
   };
 
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds((old) => {
+      const next = new Set(old);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+  };
+
+  useEffect(() => cancelLongPress, []);
+
+  const clickEntry = (entry: FsEntry) => {
+    if (busy) return;
+    if (longPressTriggered.current) {
+      longPressTriggered.current = false;
+      return;
+    }
+    if (selectionEnabled) toggleSelection(entry.id);
+    else if (entry.kind === "folder") void openFolder(entry);
+  };
+
   const renderEntry = (entry: FsEntry): JSX.Element => {
     const isFolder = entry.kind === "folder";
     const isChecked = selectedIds.has(entry.id);
@@ -1063,20 +1110,28 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
       <div
         key={entry.id}
         className={`row ${isChecked ? "selected" : ""}`}
-        onClick={() => {
-          setSelectedIds((old) => {
-            const next = new Set(old);
-            if (next.has(entry.id)) next.delete(entry.id);
-            else next.add(entry.id);
-            return next;
-          });
+        onPointerDown={(event) => {
+          if (event.pointerType !== "touch" || !touchLayout || busy) return;
+          if ((event.target as HTMLElement).closest("input, .row-actions")) return;
+          cancelLongPress();
+          longPressTriggered.current = false;
+          longPressTimer.current = setTimeout(() => {
+            longPressTriggered.current = true;
+            setSelectionMode(true);
+            setSelectedIds((old) => new Set(old).add(entry.id));
+          }, 500);
         }}
+        onPointerUp={cancelLongPress}
+        onPointerMove={cancelLongPress}
+        onPointerCancel={cancelLongPress}
+        onPointerLeave={cancelLongPress}
+        onClick={() => clickEntry(entry)}
         onDoubleClick={() => {
-          if (isFolder) void openFolder(entry);
+          if (isFolder && !touchLayout && !busy) void openFolder(entry);
         }}
       >
         <input
-          className="entry-check"
+          className={`entry-check${selectionEnabled ? "" : " selection-check-hidden"}`}
           type="checkbox"
           aria-label={t("selectEntry", { name: displayName })}
           checked={isChecked}
@@ -1097,17 +1152,17 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
               className="entry-name-button"
               onClick={(event) => {
                 event.stopPropagation();
-                setSelectedIds((old) => new Set(old).add(entry.id));
+                clickEntry(entry);
               }}
               onDoubleClick={(event) => {
                 event.stopPropagation();
-                void openFolder(entry);
+                if (!touchLayout && !busy) void openFolder(entry);
               }}
             >
               {displayName}
             </button>
           ) : (
-            <span>{displayName}</span>
+              <span>{displayName}</span>
           )}
           {entry.encrypted && (
             <span
@@ -1264,7 +1319,7 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
                   />
                 )}
                 {currentEntries.length}{" "}
-                {currentEntries.length === 1 ? t("item") : t("items")}
+                {tc("item", currentEntries.length)}
               </span>
             )}
             <button
@@ -1325,6 +1380,17 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
                 <span className="count-badge">{packingAssignments.length}</span>
               )}
             </button>
+            {touchLayout && <button
+              className="button button-secondary selection-mode-button"
+              onClick={() => selectionMode ? exitSelectionMode() : setSelectionMode(true)}
+              disabled={busy}
+              title={t(selectionMode ? "exitSelection" : "enterSelection")}
+              aria-label={t(selectionMode ? "exitSelection" : "enterSelection")}
+              aria-pressed={selectionMode}
+            >
+              <CheckSquare size={16} />
+              <span className="button-label">{t(selectionMode ? "exitSelection" : "enterSelection")}</span>
+            </button>}
           </div>
           <div className="export-group">
             <label className="format-picker">
@@ -1407,6 +1473,7 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
                 className="entry-check"
                 type="checkbox"
                 aria-label={t("selectAll")}
+                style={{ visibility: selectionEnabled ? "visible" : "hidden" }}
                 ref={(element) => {
                   if (element) {
                     const selectedCount = visible.filter((entry) => selectedIds.has(entry.id)).length;

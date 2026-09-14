@@ -12,6 +12,50 @@ afterEach(() => {
 });
 
 describe("MKAR lifecycle", () => {
+  it("limits explicit selection mode to touch devices and translates its controls", async () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
+    localStorage.setItem("mkar-language", "zh-CN");
+    try {
+      const user = userEvent.setup();
+      const codec: MkarCodec = { decode: async () => [], encode: async () => new Uint8Array() };
+      const { container } = render(<App codecLoader={() => Promise.resolve(codec)} />);
+      await user.upload(container.querySelector('input[type="file"][multiple]') as HTMLInputElement, new File(["text"], "touch.txt"));
+      const checkbox = container.querySelector('.row .entry-check') as HTMLInputElement;
+      expect(checkbox.classList.contains("selection-check-hidden")).toBe(true);
+      await user.click(screen.getByText("touch.txt"));
+      expect(checkbox.checked).toBe(false);
+      await user.click(screen.getByRole("button", { name: "选择" }));
+      expect(checkbox.classList.contains("selection-check-hidden")).toBe(false);
+      await user.click(screen.getByText("touch.txt"));
+      expect(checkbox.checked).toBe(true);
+      await user.click(screen.getByRole("button", { name: "退出选择" }));
+      expect(checkbox.checked).toBe(false);
+      expect(checkbox.classList.contains("selection-check-hidden")).toBe(true);
+    } finally {
+      cleanup();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("keeps desktop selection available without a selection-mode button", async () => {
+    const user = userEvent.setup();
+    const codec: MkarCodec = { decode: async () => [], encode: async () => new Uint8Array() };
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    await user.upload(screen.getByLabelText("Add files"), new File(["text"], "desktop.txt"));
+    const checkbox = screen.getByRole("checkbox", { name: "Select desktop.txt" }) as HTMLInputElement;
+    expect(checkbox.classList.contains("selection-check-hidden")).toBe(false);
+    expect(checkbox.checked).toBe(false);
+    expect(screen.queryByRole("button", { name: "Select" })).toBeNull();
+    await user.click(screen.getByText("desktop.txt"));
+    expect(checkbox.checked).toBe(true);
+    expect(checkbox.closest(".row")?.classList.contains("selected")).toBe(true);
+    await user.click(screen.getByText("desktop.txt"));
+    expect(checkbox.checked).toBe(false);
+    await user.click(checkbox);
+    expect(checkbox.closest(".row")?.classList.contains("selected")).toBe(true);
+  });
+
   it("derives the editable archive name from only the final MKAR suffix", () => {
     expect(importedArchiveName("aaa.mkar")).toBe("aaa");
     expect(importedArchiveName("asdfasdf.custom")).toBe("asdfasdf.custom");
