@@ -19,7 +19,7 @@ if (!useDocker && !version.split("\n")[0].includes(` ${sourceLock.emscripten} `)
   throw new Error(`libarchive requires Emscripten ${sourceLock.emscripten}; found ${version.split("\n")[0]}`);
 }
 const hash = createHash("sha256").update(version).update(run("cmake", ["--version"], root, true));
-for (const path of ["wasm/libarchive/sources.json", "wasm/libarchive/build.sh", "wasm/libarchive/writer.c", "wasm/libarchive/Dockerfile", "wasm/libarchive/rebuild-in-docker.sh"]) {
+for (const path of ["wasm/libarchive/sources.json", "wasm/libarchive/build.sh", "wasm/libarchive/build-dependencies.sh", "wasm/libarchive/build-libarchive.sh", "wasm/libarchive/writer.c", "wasm/libarchive/xxencode.c", "wasm/libarchive/Dockerfile", "wasm/libarchive/rebuild-in-docker.sh"]) {
   hash.update(path).update(readFileSync(join(root, path)));
 }
 const key = hash.digest("hex");
@@ -38,22 +38,23 @@ if (!existsSync(join(completed, "checksums.json"))) {
     writeFileSync(join(temporary, "toolchain.txt"), version);
     renameSync(temporary, completed);
   } else {
-  const sources = join(temporary, "sources");
-  mkdirSync(sources);
-  for (const [name, source] of Object.entries(sourceLock.repositories)) {
-    const target = join(sources, name);
-    run("git", ["clone", "--revision", source.revision, "--depth", "1", source.url, target]);
-    if (run("git", ["rev-parse", "HEAD"], target, true) !== source.revision) throw new Error(`${name}: unexpected source revision`);
-    if (name === "mbedtls") run("git", ["submodule", "update", "--init", "--depth", "1"], target);
-  }
-  const bzip = join(sources, "bzip2-1.0.8.tar.gz");
-  run("curl", ["--fail", "--location", "--retry", "2", sourceLock.bzip2.url, "--output", bzip]);
-  if (createHash("sha256").update(readFileSync(bzip)).digest("hex") !== sourceLock.bzip2.sha256) throw new Error("bzip2 checksum mismatch");
+    const sources = join(temporary, "sources");
+    mkdirSync(sources);
+    for (const [name, source] of Object.entries(sourceLock.packages)) {
+      const archive = join(sources, name === "bzip2" ? "bzip2-1.0.8.tar.gz" : `${name}.package`);
+      run("curl", ["--fail", "--location", "--retry", "2", source.url, "--output", archive]);
+      if (createHash("sha256").update(readFileSync(archive)).digest("hex") !== source.sha256) throw new Error(`${name} checksum mismatch`);
+      if (name !== "bzip2") {
+        run("tar", ["-xf", archive, "-C", sources]);
+        const extracted = run("tar", ["-tf", archive], root, true).split("\n")[0].split("/")[0];
+        run("mv", [join(sources, extracted), join(sources, name)]);
+      }
+    }
   run("bash", [join(root, "wasm/libarchive/build.sh"), sources, join(temporary, "build")]);
-  const checksums = Object.fromEntries(names.map((name) => [name, createHash("sha256").update(readFileSync(join(temporary, "build/artifacts", name))).digest("hex")]));
-  writeFileSync(join(temporary, "checksums.json"), JSON.stringify(checksums, null, 2));
-  writeFileSync(join(temporary, "toolchain.txt"), version);
-  renameSync(temporary, completed);
+    const checksums = Object.fromEntries(names.map((name) => [name, createHash("sha256").update(readFileSync(join(temporary, "build/artifacts", name))).digest("hex")]));
+    writeFileSync(join(temporary, "checksums.json"), JSON.stringify(checksums, null, 2));
+    writeFileSync(join(temporary, "toolchain.txt"), version);
+    renameSync(temporary, completed);
   }
 }
 const checksums = JSON.parse(readFileSync(join(completed, "checksums.json"), "utf8"));

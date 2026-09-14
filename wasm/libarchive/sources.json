@@ -1,16 +1,45 @@
 {
   "emscripten": "5.0.2",
-  "repositories": {
-    "zlib": { "url": "https://github.com/madler/zlib.git", "revision": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf" },
-    "libxml2": { "url": "https://github.com/GNOME/libxml2.git", "revision": "74f3154320df8950eceae4951975cc9dfc3a254d" },
-    "mbedtls": { "url": "https://github.com/Mbed-TLS/mbedtls.git", "revision": "c765c831e5c2a0971410692f92f7a81d6ec65ec2" },
-    "libarchive": { "url": "https://github.com/libarchive/libarchive.git", "revision": "27cbc7827172698143e440801fc0ba39ccb4f1f5" },
-    "xz": { "url": "https://github.com/tukaani-project/xz.git", "revision": "4b73f2ec19a99ef465282fbce633e8deb33691b3" },
-    "lz4": { "url": "https://github.com/lz4/lz4.git", "revision": "ebb370ca83af193212df4dcbadcc5d87bc0de2f0" },
-    "zstd": { "url": "https://github.com/facebook/zstd.git", "revision": "f8745da6ff1ad1e7bab384bd1f9d742439278e99" }
-  },
-  "bzip2": {
-    "url": "https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz",
-    "sha256": "ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269"
+  "packages": {
+    "zlib": {
+      "version": "1.3.1",
+      "url": "https://zlib.net/fossils/zlib-1.3.1.tar.gz",
+      "sha256": "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"
+    },
+    "libxml2": {
+      "version": "2.13.8",
+      "url": "https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.8.tar.xz",
+      "sha256": "277294cb33119ab71b2bc81f2f445e9bc9435b893ad15bb2cd2b0e859a0ee84a"
+    },
+    "mbedtls": {
+      "version": "3.6.3",
+      "url": "https://github.com/Mbed-TLS/mbedtls/archive/refs/tags/mbedtls-3.6.3.tar.gz",
+      "sha256": "4b68face995c8c2ce8c93ecf84f18924312f84ed025c9d2c18146dc61d217da2"
+    },
+    "libarchive": {
+      "version": "3.8.9",
+      "url": "https://www.libarchive.org/downloads/libarchive-3.8.9.tar.gz",
+      "sha256": "f5a6539059cf5e597dbeda37bfa4874b1e8dea063c8d93bf85a2b44af90a5bd4"
+    },
+    "xz": {
+      "version": "5.6.3",
+      "url": "https://github.com/tukaani-project/xz/releases/download/v5.6.3/xz-5.6.3.tar.gz",
+      "sha256": "b1d45295d3f71f25a4c9101bd7c8d16cb56348bbef3bbc738da0351e17c73317"
+    },
+    "lz4": {
+      "version": "1.10.0",
+      "url": "https://github.com/lz4/lz4/releases/download/v1.10.0/lz4-1.10.0.tar.gz",
+      "sha256": "537512904744b35e232912055ccf8ec66d768639ff3abe5788d90d792ec5f48b"
+    },
+    "zstd": {
+      "version": "1.5.7",
+      "url": "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz",
+      "sha256": "eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3"
+    },
+    "bzip2": {
+      "version": "1.0.8",
+      "url": "https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz",
+      "sha256": "ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269"
+    }
   }
 }

@@ -112,21 +112,24 @@ describe("MKAR lifecycle", () => {
       ".mkar",
       ".zip",
       ".7z",
-      ".xar",
-      ".tar.Z",
+      ".tar",
       ".tar.gz",
       ".tar.bz2",
       ".tar.xz",
-      ".tar.br",
       ".tar.zst",
       ".tar.lz4",
       ".tar.lzma",
       ".tar.lz",
-      ".tar",
+      ".tar.Z",
+      ".tar.uu",
+      ".tar.b64",
+      ".tar.br",
+      ".cpio",
+      ".xar",
+      ".iso",
       ".cab",
       ".lzh",
-      ".cpio",
-      ".ar",
+      ".a",
     ]);
   });
 
@@ -379,7 +382,7 @@ describe("MKAR lifecycle", () => {
     expect(encode).not.toHaveBeenCalled();
     expect(encodeStandard).toHaveBeenCalledWith("zip", [
       expect.objectContaining({ path: "a.txt" }),
-    ], { variant: "gnu" });
+    ], { variant: "gnu" }, expect.any(Function));
     expect(screen.getByText("a.txt")).toBeTruthy();
     expect(screen.getByText("b.txt")).toBeTruthy();
     createObjectUrl.mockRestore();
@@ -463,7 +466,7 @@ describe("MKAR lifecycle", () => {
     expect(encodeStandard).toHaveBeenCalledWith("zip", [
       expect.objectContaining({ path: "c" }),
       expect.objectContaining({ path: "d" }),
-    ], { variant: "gnu" });
+    ], { variant: "gnu" }, expect.any(Function));
   });
 
   it("downloads a file without passing it through an archive encoder", async () => {
@@ -539,7 +542,7 @@ describe("MKAR lifecycle", () => {
     expect(encodeStandard).toHaveBeenCalledWith("zip", [
       expect.objectContaining({ path: "c" }),
       expect.objectContaining({ path: "d" }),
-    ], { variant: "gnu" });
+    ], { variant: "gnu" }, expect.any(Function));
     expect(screen.getByTitle("a")).toBeTruthy();
   });
 

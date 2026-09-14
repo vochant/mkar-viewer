@@ -6,6 +6,8 @@ src/generated/libarchive/
 *.wasm
 *.tgz
 *.tar.gz
+__pycache__/
+*.py[cod]
 wasm/remkar-wasm/target/
 .vercel
 .env*

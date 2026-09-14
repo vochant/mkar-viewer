@@ -31,7 +31,7 @@ function verify(format: StandardArchiveFormat, bytes: Uint8Array, expected = pre
   const listing = spawnSync("bsdtar", ["-tf", path], { encoding: "utf8" });
   expect(listing.error).toBeUndefined();
   expect(listing.status, listing.stderr).toBe(0);
-  expect(listing.stdout.trimEnd().split("\n").map((name) => name.replace(/\/$/, "")).sort()).toEqual(expected.map((entry) => entry.path).sort());
+  expect(listing.stdout.trimEnd().split("\n").map((name) => name.replace(/\/$/, "").replace(/^\.$/, "")).filter(Boolean).sort()).toEqual(expected.map((entry) => entry.path).sort());
   const details = spawnSync("bsdtar", ["-tvf", path], { encoding: "utf8" });
   expect(details.status, details.stderr).toBe(0);
   for (const entry of expected) {
@@ -50,9 +50,21 @@ function verify(format: StandardArchiveFormat, bytes: Uint8Array, expected = pre
 }
 
 describe("compiled libarchive writer", () => {
-  it.each(["zip", "7z", "cpio", "xar", "tar", "tar.gz", "tar.bz2", "tar.xz", "tar.zst", "tar.lz4", "tar.lzma", "tar.lz", "tar.Z"] as const)("writes interoperable %s", (format) => {
+  it.each(["zip", "7z", "cpio", "xar", "iso", "shar", "tar", "tar.gz", "tar.bz2", "tar.xz", "tar.zst", "tar.lz4", "tar.lzma", "tar.lz", "tar.Z", "tar.uu", "tar.b64", "tar.xx"] as const)("writes non-empty interoperable %s", (format) => {
     const bytes = writeStandardArchive(module, format, prepared, { variant: "gnu" });
+    expect(bytes.byteLength).toBeGreaterThan(0);
     verify(format, bytes);
+  });
+  it("writes xxencode with the required header newline and zero line", () => {
+    const bytes = writeStandardArchive(module, "tar.xx", prepared, { variant: "gnu" });
+    const text = new TextDecoder().decode(bytes);
+    expect(text.startsWith("begin 644 -\n")).toBe(true);
+    expect(text).toContain("\n+\nend\n");
+  });
+  it("does not apply uuencode zero-byte compression to xxencode", () => {
+    const entries = prepareArchiveEntries([{ id: "zeros", name: "zeros", path: "zeros", kind: "file", content: new Uint8Array(3) }]);
+    const text = new TextDecoder().decode(writeStandardArchive(module, "tar.xx", entries, { variant: "gnu" }));
+    expect(text).toContain("1++++\n");
   });
   it.each(["gnu", "pax", "ustar", "v7"] as const)("preserves tar variant %s", (variant) => {
     verify("tar", writeStandardArchive(module, "tar", prepared, { variant }));

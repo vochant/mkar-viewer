@@ -10,7 +10,7 @@ export const digest = (bytes) => createHash("sha256").update(bytes).digest("hex"
 
 export function sourceDigest() {
   const hash = createHash("sha256");
-  for (const name of ["wasm/libarchive/sources.json", "wasm/libarchive/build.sh", "wasm/libarchive/writer.c"]) {
+  for (const name of ["wasm/libarchive/sources.json", "wasm/libarchive/build.sh", "wasm/libarchive/build-dependencies.sh", "wasm/libarchive/build-libarchive.sh", "wasm/libarchive/writer.c", "wasm/libarchive/xxencode.c"]) {
     hash.update(name).update(readFileSync(join(root, name)));
   }
   return hash.digest("hex");

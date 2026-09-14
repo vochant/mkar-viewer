@@ -71,7 +71,7 @@ export type MkarOutput = {
 };
 
 export interface MkarCodec {
-  encodeStandard?(format: StandardArchiveFormat, entries: FsEntry[], options: TarOptions): Promise<Uint8Array>;
+  encodeStandard?(format: StandardArchiveFormat, entries: FsEntry[], options: TarOptions, onProgress?: (completed: number, total: number) => void): Promise<Uint8Array>;
   decode(bytes: Uint8Array, options?: MkarDecodeOptions): Promise<FsEntry[]>;
   encode(entries: FsEntry[], options?: MkarEncodeOptions): Promise<Uint8Array>;
   read?(
@@ -85,9 +85,9 @@ export interface MkarCodec {
   ): Promise<FsEntry[]>;
   close?(): void;
   compressBrotli?(bytes: Uint8Array): Promise<Uint8Array>;
-  encodeAr?(entries: FsEntry[]): Promise<Uint8Array>;
-  encodeCab?(entries: FsEntry[]): Promise<Uint8Array>;
-  encodeLzh?(entries: FsEntry[]): Promise<Uint8Array>;
+  encodeAr?(entries: FsEntry[], onProgress?: (completed: number, total: number) => void): Promise<Uint8Array>;
+  encodeCab?(entries: FsEntry[], onProgress?: (completed: number, total: number) => void): Promise<Uint8Array>;
+  encodeLzh?(entries: FsEntry[], onProgress?: (completed: number, total: number) => void): Promise<Uint8Array>;
   open?(
     file: File,
     options?: MkarDecodeOptions,
@@ -300,16 +300,20 @@ export function createMkarCodec(
       }
     },
 
-    async encodeAr(entries) {
+    async encodeAr(entries, onProgress) {
       if (!bindings.encodeAr) throw new MkarError("AR packaging is unavailable");
-      return bindings.encodeAr(toArchiveEntries(entries));
+      const result = bindings.encodeAr(toArchiveEntries(entries));
+      onProgress?.(entries.length, entries.length);
+      return result;
     },
 
-    async encodeCab(entries) {
+    async encodeCab(entries, onProgress) {
       if (!bindings.encodeCab)
         throw new MkarError("CAB packaging is unavailable");
       try {
-        return bindings.encodeCab(toArchiveEntries(entries));
+        const result = bindings.encodeCab(toArchiveEntries(entries));
+        onProgress?.(entries.length, entries.length);
+        return result;
       } catch (error) {
         throw normalizeError(error);
       }
@@ -325,11 +329,13 @@ export function createMkarCodec(
       }
     },
 
-    async encodeLzh(entries) {
+    async encodeLzh(entries, onProgress) {
       if (!bindings.encodeLzh)
         throw new MkarError("LZH packaging is unavailable");
       try {
-        return bindings.encodeLzh(toArchiveEntries(entries));
+        const result = bindings.encodeLzh(toArchiveEntries(entries));
+        onProgress?.(entries.length, entries.length);
+        return result;
       } catch (error) {
         throw normalizeError(error);
       }
@@ -988,6 +994,7 @@ export function loadMkarCodec(): Promise<MkarCodec> {
         planArchive,
         encodePlannedEntry,
         compressBrotli,
+        encodeAr,
         encodeCab,
         encodeLzh,
       }),

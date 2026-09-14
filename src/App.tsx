@@ -50,20 +50,25 @@ const FORMAT_OPTIONS: ArchiveFormat[] = [
   "mkar",
   "zip",
   "7z",
-  "xar",
-  "tar.Z",
+  "tar",
   "tar.gz",
   "tar.bz2",
   "tar.xz",
-  "tar.br",
   "tar.zst",
   "tar.lz4",
   "tar.lzma",
   "tar.lz",
-  "tar",
+  "tar.Z",
+  "tar.uu",
+  "tar.b64",
+  "tar.xx",
+  "tar.br",
+  "cpio",
+  "xar",
+  "iso",
+  "shar",
   "cab",
   "lzh",
-  "cpio",
   "ar",
 ];
 
@@ -83,6 +88,10 @@ function extensionFor(format: ArchiveFormat) {
       return "tar.lz";
     case "cpio":
       return "cpio";
+    case "iso":
+      return "iso";
+    case "shar":
+      return "shar";
     default:
       return format;
   }
@@ -839,6 +848,8 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
         encodeEntries,
         codec,
         encodeOptions,
+        (completed, total) =>
+          setNotice({ key: "exportingEntries", vars: { completed, total } }),
       );
       const blob = new Blob([toArrayBuffer(bytes)], {
         type:
@@ -1322,7 +1333,7 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
               >
                 {FORMAT_OPTIONS.map((item) => (
                   <option key={item} value={item}>
-                    .{item}
+                    .{extensionFor(item)}
                   </option>
                 ))}
               </select>

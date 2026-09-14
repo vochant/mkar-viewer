@@ -1,12 +1,11 @@
 {
   "schema": 1,
-  "sourceSha256": "357cee768c29ab5d3a647159dc0bbe2e5cf04ba4c4fb5e8dfc9f91f6635c22a8",
+  "sourceSha256": "c7e2114ef5c73341d7f6c3fb972e3ea1b43088b9801e4522db33ac89a60b4835",
   "files": {
-    "libarchive.mjs": "95cada4acfd3a0eb1597893714f543c2879734737014df7d125921699e20b80c",
-    "libarchive.wasm": "91d4b67be82de2f7797dc46874567f8c77e94adde2d0eb89ed526312ecf263ba",
-    "NOTICE.txt": "a7cc8739ff764bf62dfadcd042e69ae26de105e3b0f4b3b75d65161ec0eac727"
+    "libarchive.mjs": "09fc86f876de604c785e479b2d5ed3e8a05dc7364c5ecbf726c0f56a3e4bcbdb",
+    "libarchive.wasm": "ceff89048204701b258bcc7342ce3912b98fe5809689d19883d41e9fe47aa1a3",
+    "NOTICE.txt": "6c76038b4b43648113a6ad6dfbc6adf0b2f105a2863baf4b5ed10a775732ee9a"
   },
-  "toolchain": "Emscripten 5.0.2",
-  "libarchive": "3.8.9",
-  "provenance": "Pinned sources compiled externally; writer.c uses strict symbols, dynamic output, explicit filter selection and unpadded final blocks."
+  "toolchain": "Docker emscripten/emsdk:5.0.2",
+  "buildCache": "5274a3bde7e1a645e9a903bc21bb2bd679dfa78666c40f38818f372b4953ab47"
 }

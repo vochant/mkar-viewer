@@ -14,19 +14,19 @@ export interface LibarchiveModule {
 
 export function archiveConfiguration(format: StandardArchiveFormat, options: TarOptions) {
   const variants = { gnu: "gnutar", pax: "pax", ustar: "ustar", v7: "v7tar" };
-  const filters: Record<string, string> = { "tar": "none", "tar.gz": "gzip", "tar.bz2": "bzip2", "tar.xz": "xz", "tar.zst": "zstd", "tar.lz4": "lz4", "tar.lzma": "lzma", "tar.lz": "lzip", "tar.Z": "compress" };
+  const filters: Record<string, string> = { "tar": "none", "tar.gz": "gzip", "tar.bz2": "bzip2", "tar.xz": "xz", "tar.zst": "zstd", "tar.lz4": "lz4", "tar.lzma": "lzma", "tar.lz": "lzip", "tar.Z": "compress", "tar.uu": "uuencode", "tar.b64": "b64encode", "tar.xx": "xxencode" };
   if (format in filters) {
     const variant = variants[options.variant];
     if (!variant) throw new Error(`Unsupported tar variant: ${options.variant}`);
     return { format: variant, filter: filters[format] };
   }
-  const formats = { zip: "zip", "7z": "7zip", cpio: "newc", xar: "xar" };
+  const formats = { zip: "zip", "7z": "7zip", cpio: "newc", xar: "xar", iso: "iso9660", shar: "shar" };
   const archiveFormat = formats[format as keyof typeof formats];
   if (!archiveFormat) throw new Error(`Unsupported archive format: ${format}`);
   return { format: archiveFormat, filter: "none" };
 }
 
-export function writeStandardArchive(module: LibarchiveModule, format: StandardArchiveFormat, entries: ArchiveInput[], options: TarOptions, maxOutputBytes = 512 * 1024 * 1024) {
+export function writeStandardArchive(module: LibarchiveModule, format: StandardArchiveFormat, entries: ArchiveInput[], options: TarOptions, maxOutputBytes = 512 * 1024 * 1024, onProgress?: (completed: number, total: number) => void) {
   const configuration = archiveConfiguration(format, options);
   const files = entries;
   const create = module.cwrap("la_create", "number", ["string", "string", "number"]);
@@ -47,6 +47,7 @@ export function writeStandardArchive(module: LibarchiveModule, format: StandardA
         module.HEAPU8.set(entry.content, pointer);
         check(add(writer, entry.kind === "folder" ? `${entry.path}/` : entry.path, Number(entry.kind === "folder"), pointer, entry.content.length));
       } finally { module._free(pointer); }
+      onProgress?.(files.indexOf(entry) + 1, files.length);
     }
     check(module._la_finish(writer));
     const length = module._la_size(writer);

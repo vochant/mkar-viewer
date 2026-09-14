@@ -14,16 +14,16 @@ are met:
 1. Redistributions of source code must retain the above copyright
    notice, this list of conditions and the following disclaimer.
 
-2. The origin of this software must not be misrepresented; you must
-   not claim that you wrote the original software.  If you use this
-   software in a product, an acknowledgment in the product
+2. The origin of this software must not be misrepresented; you must 
+   not claim that you wrote the original software.  If you use this 
+   software in a product, an acknowledgment in the product 
    documentation would be appreciated but is not required.
 
 3. Altered source versions must be plainly marked as such, and must
    not be misrepresented as being the original software.
 
-4. The name of the author may not be used to endorse or promote
-   products derived from this software without specific prior written
+4. The name of the author may not be used to endorse or promote 
+   products derived from this software without specific prior written 
    permission.
 
 THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
@@ -1558,12 +1558,6 @@ XZ Utils Licensing
         free software licenses. These aren't built or installed as
         part of XZ Utils.
 
-    The following command may be helpful in finding per-file license
-    information. It works on xz.git and on a clean file tree extracted
-    from a release tarball.
-
-        sh build-aux/license-check.sh -v
-
     For the files under the BSD Zero Clause License (0BSD), if
     a copyright notice is needed, the following is sufficient:
 
@@ -1582,6 +1576,25 @@ XZ Utils Licensing
       - COPYING.LGPLv2.1: GNU Lesser General Public License version 2.1
       - COPYING.GPLv2: GNU General Public License version 2
       - COPYING.GPLv3: GNU General Public License version 3
+
+    A note about old XZ Utils releases:
+
+        XZ Utils releases 5.4.6 and older and 5.5.1alpha have a
+        significant amount of code put into the public domain and
+        that obviously remains so. The switch from public domain to
+        0BSD for newer releases was made in Febrary 2024 because
+        public domain has (real or perceived) legal ambiguities in
+        some jurisdictions.
+
+        There is very little *practical* difference between public
+        domain and 0BSD. The main difference likely is that one
+        shouldn't claim that 0BSD-licensed code is in the public
+        domain; 0BSD-licensed code is copyrighted but available under
+        an extremely permissive license. Neither 0BSD nor public domain
+        require retaining or reproducing author, copyright holder, or
+        license notices when distributing the software. (Compare to,
+        for example, BSD 2-Clause "Simplified" License which does have
+        such requirements.)
 
     If you have questions, don't hesitate to ask for more information.
     The contact information is in the README file.
@@ -1605,7 +1618,7 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
                        Version 2, June 1991
 
  Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
- <https://fsf.org/>
+ 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  Everyone is permitted to copy and distribute verbatim copies
  of this license document, but changing it is not allowed.
 
@@ -1907,7 +1920,8 @@ the "copyright" line and a pointer to where the full notice is found.
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License along
-    with this program; if not, see <https://www.gnu.org/licenses/>.
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 Also add information on how to contact you by electronic and paper mail.
 
@@ -1931,8 +1945,8 @@ necessary.  Here is a sample; alter the names:
   Yoyodyne, Inc., hereby disclaims all copyright interest in the program
   `Gnomovision' (which makes passes at compilers) written by James Hacker.
 
-  <signature of Moe Ghoul>, 1 April 1989
-  Moe Ghoul, President of Vice
+  <signature of Ty Coon>, 1 April 1989
+  Ty Coon, President of Vice
 
 This General Public License does not permit incorporating your program into
 proprietary programs.  If your program is a subroutine library, you may
@@ -2621,7 +2635,7 @@ Public License instead of this License.  But first, please read
                        Version 2.1, February 1999
 
  Copyright (C) 1991, 1999 Free Software Foundation, Inc.
- <https://fsf.org/>
+ 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  Everyone is permitted to copy and distribute verbatim copies
  of this license document, but changing it is not allowed.
 
@@ -3103,7 +3117,8 @@ convey the exclusion of warranty; and each file should have at least the
     Lesser General Public License for more details.
 
     You should have received a copy of the GNU Lesser General Public
-    License along with this library; if not, see <https://www.gnu.org/licenses/>.
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 Also add information on how to contact you by electronic and paper mail.
 
@@ -3114,8 +3129,8 @@ necessary.  Here is a sample; alter the names:
   Yoyodyne, Inc., hereby disclaims all copyright interest in the
   library `Frob' (a library for tweaking knobs) written by James Random Hacker.
 
-  <signature of Moe Ghoul>, 1 April 1990
-  Moe Ghoul, President of Vice
+  <signature of Ty Coon>, 1 April 1990
+  Ty Coon, President of Vice
 
 That's all there is to it!
 

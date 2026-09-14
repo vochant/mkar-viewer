@@ -1,5 +1,9 @@
 import type { ArchiveFormat, FsEntry } from "./types";
 import type { TarOptions } from "./mkarCodec";
+import createLibarchiveModule from "./generated/libarchive/libarchive.mjs";
+import libarchiveWasmUrl from "./generated/libarchive/libarchive.wasm?url";
+
+export { createLibarchiveModule, libarchiveWasmUrl };
 
 export type StandardArchiveFormat = Exclude<ArchiveFormat, "mkar" | "ar" | "cab" | "lzh" | "tar.br">;
 export type ArchiveInput = { path: string; kind: "file" | "folder"; content: Uint8Array };
@@ -33,7 +37,7 @@ export function prepareArchiveEntries(entries: FsEntry[]): ArchiveInput[] {
   return [...canonical.values()].sort((first, second) => first.path < second.path ? -1 : first.path > second.path ? 1 : 0);
 }
 
-export function encodeStandardArchive(format: StandardArchiveFormat, entries: FsEntry[], options: TarOptions): Promise<Uint8Array> {
+export function encodeStandardArchive(format: StandardArchiveFormat, entries: FsEntry[], options: TarOptions, onProgress?: (completed: number, total: number) => void): Promise<Uint8Array> {
   const prepared = prepareArchiveEntries(entries);
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL("./libarchive.worker.ts", import.meta.url), { type: "module" });
@@ -42,7 +46,11 @@ export function encodeStandardArchive(format: StandardArchiveFormat, entries: Fs
     function fail(error: Error) { finish(); reject(error); }
     worker.onerror = (event) => fail(new Error(event.message || "libarchive worker failed"));
     worker.onmessageerror = () => fail(new Error("Invalid libarchive worker response"));
-    worker.onmessage = (event: MessageEvent<{ bytes?: Uint8Array; error?: string }>) => {
+    worker.onmessage = (event: MessageEvent<{ bytes?: Uint8Array; error?: string; progress?: { completed: number; total: number } }>) => {
+      if (event.data.progress) {
+        onProgress?.(event.data.progress.completed, event.data.progress.total);
+        return;
+      }
       finish();
       if (event.data.bytes instanceof Uint8Array) resolve(event.data.bytes);
       else reject(new Error(event.data.error ?? "libarchive returned no output"));

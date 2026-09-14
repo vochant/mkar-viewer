@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+int archive_write_add_filter_xxencode(struct archive *);
+
 struct writer {
     struct archive *archive;
     unsigned char *data;
@@ -14,6 +16,7 @@ struct writer {
     size_t capacity;
     size_t limit;
     int status;
+    int xxencode;
     char error[512];
 };
 
@@ -62,9 +65,13 @@ static int select_filter(struct archive *archive, const char *filter) {
     if (!strcmp(filter, "lz4")) return archive_write_add_filter_lz4(archive);
     if (!strcmp(filter, "zstd")) return archive_write_add_filter_zstd(archive);
     if (!strcmp(filter, "compress")) return archive_write_add_filter_compress(archive);
+    if (!strcmp(filter, "uuencode")) return archive_write_add_filter_uuencode(archive);
+    if (!strcmp(filter, "b64encode")) return archive_write_add_filter_b64encode(archive);
+    if (!strcmp(filter, "xxencode")) return archive_write_add_filter_xxencode(archive);
     archive_set_error(archive, EINVAL, "Unsupported compression filter");
     return ARCHIVE_FATAL;
 }
+
 
 struct writer *la_create(const char *format, const char *filter, size_t limit) {
     if (!limit || limit > 512 * 1024 * 1024 || !setlocale(LC_ALL, "C.UTF-8")) return NULL;
@@ -108,7 +115,9 @@ int la_add(struct writer *writer, const char *path, int directory, const void *d
 }
 
 int la_finish(struct writer *writer) {
-    return writer->status != ARCHIVE_OK ? writer->status : remember(writer, archive_write_close(writer->archive));
+    if (writer->status != ARCHIVE_OK) return writer->status;
+    int status = remember(writer, archive_write_close(writer->archive));
+    return status;
 }
 
 const char *la_error(struct writer *writer) { return writer->error; }
