@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -1323,25 +1324,43 @@ for (const language of Object.keys(selectionLabels) as Language[]) {
   [messages[language].enterSelection, messages[language].exitSelection] = selectionLabels[language];
 }
 
-function languageFromLocale(locale: string): Language {
-  const value = locale.toLowerCase().replaceAll("_", "-");
-  if (value === "la" || value.startsWith("la-")) return "la";
-  if (value.startsWith("zh-tw") || value.startsWith("zh-hk") || value.startsWith("zh-mo") || value.startsWith("zh-hant")) return "zh-TW";
-  if (value.startsWith("zh")) return "zh-CN";
-  if (value.startsWith("ja")) return "ja";
-  if (value.startsWith("ko")) return "ko";
-  if (value.startsWith("fr")) return "fr";
-  if (value.startsWith("es")) return "es";
-  if (value.startsWith("it")) return "it";
-  if (value.startsWith("de")) return "de";
-  if (value.startsWith("ru")) return "ru";
-  return "en";
+const languageByCode: Partial<Record<string, Language>> = {
+  en: "en",
+  ja: "ja",
+  la: "la",
+  ko: "ko",
+  fr: "fr",
+  es: "es",
+  it: "it",
+  de: "de",
+  ru: "ru",
+};
+
+function languageFromLocale(locale: string): Language | undefined {
+  try {
+    const parsed = new Intl.Locale(locale.replaceAll("_", "-"));
+    if (parsed.language === "zh") {
+      return parsed.script === "Hant" || ["HK", "MO", "TW"].includes(parsed.region ?? "")
+        ? "zh-TW"
+        : "zh-CN";
+    }
+    return languageByCode[parsed.language];
+  } catch {
+    return undefined;
+  }
 }
 
 function initialLanguage(): Language {
   const saved = localStorage.getItem("mkar-language") as Language | null;
   if (saved && saved in messages) return saved;
-  return languageFromLocale(navigator.language);
+  const preferred = navigator.languages?.length
+    ? navigator.languages
+    : [navigator.language];
+  for (const locale of preferred) {
+    const language = languageFromLocale(locale);
+    if (language) return language;
+  }
+  return "en";
 }
 
 const I18nContext = createContext<{
@@ -1353,6 +1372,9 @@ const I18nContext = createContext<{
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(initialLanguage);
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
   const setLanguage = (next: Language) => {
     setLanguageState(next);
     localStorage.setItem("mkar-language", next);
