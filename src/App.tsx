@@ -379,7 +379,6 @@ function codecErrorNotice(error: unknown): Notice {
 function AppView({ codecLoader = loadMkarCodec }: AppProps) {
   const { language, setLanguage, t } = useI18n();
   const [entries, setEntries] = useState<FsEntry[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [currentPath, setCurrentPath] = useState("");
   const [query, setQuery] = useState("");
@@ -674,7 +673,6 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
         ...incoming,
       ]),
     );
-    setSelected(incoming[0].id);
     setSelectedIds(new Set());
     setDirty(true);
     setNotice({ key: "filesAdded", vars: { count: incoming.length } });
@@ -935,7 +933,6 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
             new Uint8Array(await file.arrayBuffer()),
           );
       setEntries(imported);
-      setSelected(imported[0]?.id ?? null);
       setSelectedIds(new Set());
       setCurrentPath("");
       setQuery("");
@@ -966,7 +963,6 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
     withDiscardConfirmation(() => {
       if (codecState.status === "ready") codecState.codec.close?.();
       setEntries([]);
-      setSelected(null);
       setSelectedIds(new Set());
       setCurrentPath("");
       setQuery("");
@@ -1012,7 +1008,6 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
         ]);
       }
       setCurrentPath(entry.path);
-      setSelected(null);
       setSelectedIds(new Set());
       setQuery("");
       setNotice({ key: "opened", vars: { name: entry.name } });
@@ -1030,7 +1025,6 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
 
   const goBack = () => {
     setCurrentPath(parentPath(currentPath));
-    setSelected(null);
     setSelectedIds(new Set());
     setQuery("");
   };
@@ -1068,10 +1062,17 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
     return (
       <div
         key={entry.id}
-        className={`row ${selected === entry.id ? "selected" : ""}`}
+        className={`row ${isChecked ? "selected" : ""}`}
         onClick={() => {
+          setSelectedIds((old) => {
+            const next = new Set(old);
+            if (next.has(entry.id)) next.delete(entry.id);
+            else next.add(entry.id);
+            return next;
+          });
+        }}
+        onDoubleClick={() => {
           if (isFolder) void openFolder(entry);
-          else setSelected(entry.id);
         }}
       >
         <input
@@ -1095,6 +1096,10 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
             <button
               className="entry-name-button"
               onClick={(event) => {
+                event.stopPropagation();
+                setSelectedIds((old) => new Set(old).add(entry.id));
+              }}
+              onDoubleClick={(event) => {
                 event.stopPropagation();
                 void openFolder(entry);
               }}
@@ -1402,19 +1407,28 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
                 className="entry-check"
                 type="checkbox"
                 aria-label={t("selectAll")}
+                ref={(element) => {
+                  if (element) {
+                    const selectedCount = visible.filter((entry) => selectedIds.has(entry.id)).length;
+                    element.indeterminate = selectedCount > 0 && selectedCount < visible.length;
+                  }
+                }}
                 checked={
                   visible.length > 0 &&
                   visible.every((entry) => selectedIds.has(entry.id))
                 }
                 onChange={(event) => {
+                  const checked = event.target.checked;
                   setSelectedIds((old) => {
                     const next = new Set(old);
                     for (const entry of visible) {
-                      if (event.target.checked) next.add(entry.id);
+                      if (checked) next.add(entry.id);
                       else next.delete(entry.id);
                     }
                     return next;
                   });
+                  if (visible.length > 0) {
+                  }
                 }}
               />
               <span>{t("name")}</span>

@@ -1,5 +1,7 @@
 import { writeStandardArchive } from "./libarchiveRuntime";
-import { createLibarchiveModule as createModule, libarchiveWasmUrl as wasmUrl, type ArchiveRequest } from "./libarchive";
+import createModule from "./generated/libarchive/libarchive.mjs";
+import wasmUrl from "./generated/libarchive/libarchive.wasm?url";
+import type { ArchiveRequest } from "./libarchive";
 
 let modulePromise: ReturnType<typeof loadModule> | undefined;
 

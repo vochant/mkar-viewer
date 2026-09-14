@@ -1,19 +1,6 @@
-import initWasm, {
-  buildManifest,
-  compressBrotli,
-  decodeArchive,
-  decodeStoredEntry,
-  encodeArchive,
-  encodeAr,
-  encodeCab,
-  encodeLzh,
-  encodePlannedEntry,
-  inspectEntryMetadata,
-  inspectEntryProp,
-  planArchive,
-} from "./generated/remkar-wasm/remkar_wasm";
 import type { FsEntry } from "./types";
 import { encodeStandardArchive, type StandardArchiveFormat } from "./libarchive";
+import { canUseArchiveWorker, callMkarWorker, callMkarWorkerWithProgress } from "./archiveWorker";
 
 export type MkarErrorCode =
   | "INVALID_ARCHIVE"
@@ -257,8 +244,7 @@ export function createMkarCodec(
     async read(entry, requestPassword) {
       try {
         const passwords =
-          entry.source?.kind === "mkar" &&
-          openContext?.file === entry.source.file
+          entry.source?.kind === "mkar" && openContext
             ? openContext.passwords
             : new Map<number, string>();
         return await readEntryContent(
@@ -982,24 +968,67 @@ function isErrorCode(value: unknown): value is MkarErrorCode {
 let codecPromise: Promise<MkarCodec> | undefined;
 
 export function loadMkarCodec(): Promise<MkarCodec> {
-  if (!codecPromise) {
-    codecPromise = initWasm().then(() =>
-      createMkarCodec({
-        decodeArchive,
-        encodeArchive,
-        inspectEntryMetadata,
-        inspectEntryProp,
-        decodeStoredEntry,
-        buildManifest,
-        planArchive,
-        encodePlannedEntry,
-        compressBrotli,
-        encodeAr,
-        encodeCab,
-        encodeLzh,
-      }),
-    );
+  if (!codecPromise && canUseArchiveWorker()) {
+    const proxy: MkarCodec = {
+      decode: (bytes, options) => callMkarWorker("decode", { bytes, options }) as Promise<FsEntry[]>,
+      encode: (entries, options) => callMkarWorker("encode", { entries, options }) as Promise<Uint8Array>,
+      compressBrotli: (bytes) => callMkarWorker("compressBrotli", bytes) as Promise<Uint8Array>,
+      encodeAr: (entries) => callMkarWorker("encodeAr", { entries }) as Promise<Uint8Array>,
+      encodeCab: (entries) => callMkarWorker("encodeCab", { entries }) as Promise<Uint8Array>,
+      encodeLzh: (entries) => callMkarWorker("encodeLzh", { entries }) as Promise<Uint8Array>,
+      open: (file, options, onProgress) => callMkarWorkerWithProgress(
+        "open",
+        { file, options },
+        onProgress ? (completed, total) => onProgress({ phase: "opening", completed, total }) : undefined,
+      ) as Promise<FsEntry[]>,
+      read: (entry, requestPassword) => callMkarWorkerWithProgress(
+        "read",
+        { entry },
+        undefined,
+        requestPassword,
+      ) as Promise<Uint8Array>,
+      reveal: (entry, includeEncryptedDescendants, requestPassword) => callMkarWorkerWithProgress(
+        "reveal",
+        { entry, includeEncryptedDescendants },
+        undefined,
+        requestPassword,
+      ) as Promise<FsEntry[]>,
+      close: () => { void callMkarWorker("close", undefined); },
+      encodeTo: async (entries, output, options, onProgress, requestPassword) => {
+        const bytes = await callMkarWorkerWithProgress(
+          "encodeTo",
+          { entries, options },
+          onProgress ? (completed, total) => onProgress({ phase: "exporting", completed, total }) : undefined,
+          requestPassword,
+        ) as Uint8Array;
+        await output.write(bytes);
+      },
+    };
+    codecPromise = Promise.resolve(proxy);
   }
+  if (!codecPromise && typeof window === "undefined") {
+    codecPromise = Promise.all([
+      import("./generated/remkar-wasm/remkar_wasm"),
+      import("./generated/remkar-wasm/remkar_wasm_bg.wasm?url"),
+    ]).then(async ([wasm, wasmUrl]) => {
+      const bindings = await wasm.default(wasmUrl.default);
+      return createMkarCodec({
+        decodeArchive: wasm.decodeArchive,
+        encodeArchive: wasm.encodeArchive,
+        inspectEntryMetadata: wasm.inspectEntryMetadata,
+        inspectEntryProp: wasm.inspectEntryProp,
+        decodeStoredEntry: wasm.decodeStoredEntry,
+        buildManifest: wasm.buildManifest,
+        planArchive: wasm.planArchive,
+        encodePlannedEntry: wasm.encodePlannedEntry,
+        compressBrotli: wasm.compressBrotli,
+        encodeAr: wasm.encodeAr,
+        encodeCab: wasm.encodeCab,
+        encodeLzh: wasm.encodeLzh,
+      });
+    });
+  }
+  if (!codecPromise) return Promise.reject(new Error("Archive workers are unavailable in this environment"));
   return codecPromise;
 }
 

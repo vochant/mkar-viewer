@@ -123,10 +123,12 @@ describe("MKAR lifecycle", () => {
       ".tar.Z",
       ".tar.uu",
       ".tar.b64",
+      ".tar.xx",
       ".tar.br",
       ".cpio",
       ".xar",
       ".iso",
+      ".shar",
       ".cab",
       ".lzh",
       ".a",
@@ -196,10 +198,10 @@ describe("MKAR lifecycle", () => {
 
     expect(await screen.findByText("root/")).toBeTruthy();
     expect(screen.queryByText("nested/")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "root/" }));
+    await user.dblClick(screen.getByRole("button", { name: "root/" }));
     expect(await screen.findByText("nested/")).toBeTruthy();
     expect(screen.queryByText("deep.txt")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "nested/" }));
+    await user.dblClick(screen.getByRole("button", { name: "nested/" }));
     expect(await screen.findByText("deep.txt")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Back" }));
     expect(await screen.findByText("nested/")).toBeTruthy();
@@ -453,8 +455,8 @@ describe("MKAR lifecycle", () => {
       screen.getByLabelText("Import mkar"),
       new File([new Uint8Array([1])], "source.mkar"),
     );
-    await user.click(screen.getByRole("button", { name: "a/" }));
-    await user.click(screen.getByRole("button", { name: "b/" }));
+    await user.dblClick(screen.getByRole("button", { name: "a/" }));
+    await user.dblClick(screen.getByRole("button", { name: "b/" }));
     await user.click(screen.getByRole("checkbox", { name: "Select c" }));
     await user.click(screen.getByRole("checkbox", { name: "Select d" }));
     await user.selectOptions(
@@ -530,7 +532,7 @@ describe("MKAR lifecycle", () => {
       screen.getByLabelText("Import mkar"),
       new File([new Uint8Array([1])], "source.mkar"),
     );
-    await user.click(screen.getByRole("button", { name: "a/" }));
+    await user.dblClick(screen.getByRole("button", { name: "a/" }));
     await user.selectOptions(
       screen.getByRole("combobox", { name: "Export format" }),
       "zip",
@@ -626,7 +628,7 @@ describe("MKAR lifecycle", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Export MKAR" }));
-    await user.click(screen.getByRole("button", { name: "root/" }));
+    await user.dblClick(screen.getByRole("button", { name: "root/" }));
     await user.click(screen.getByRole("button", { name: "Export MKAR" }));
 
     expect(downloads).toEqual(["a.mkar.mkar", "a.mkar.mkar"]);

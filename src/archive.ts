@@ -1,5 +1,6 @@
 import type { MkarCodec, MkarEncodeOptions, TarVariant } from "./mkarCodec";
 import type { ArchiveFormat, FsEntry } from "./types";
+import { canUseArchiveWorker, encodeInArchiveWorker } from "./archiveWorker";
 
 export type ArchiveEncodeOptions = MkarEncodeOptions & {
   tarVariant?: TarVariant;
@@ -12,6 +13,20 @@ export async function encodeArchive(
   options: ArchiveEncodeOptions = {},
   onProgress?: (completed: number, total: number) => void,
 ) {
+  if (
+    canUseArchiveWorker() &&
+    entries.every((entry) => entry.kind === "folder" || entry.content)
+  ) {
+    const prepared = entries.map((entry) => ({
+      path: entry.path,
+      kind: entry.kind,
+      content: entry.content ?? new Uint8Array(),
+    }));
+    return encodeInArchiveWorker(format, prepared, {
+      ...options,
+      variant: options.tarVariant ?? "gnu",
+    }, onProgress);
+  }
   if (!codec) throw new Error(`${format} Wasm adapter is not loaded`);
   if (format === "mkar") return codec.encode(entries, options);
   if (format === "ar" && codec.encodeAr) return onProgress ? codec.encodeAr(entries, onProgress) : codec.encodeAr(entries);

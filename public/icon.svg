@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">MKAR archive</title>
+  <desc id="desc">A black outlined archive box with MKAR lettering on a white circular background.</desc>
+  <circle cx="128" cy="128" r="126" fill="#fff"/>
+  <g fill="none" stroke="#151515" stroke-linejoin="round" stroke-linecap="round">
+    <path stroke-width="10" d="M73 73h110l19 25v80a13 13 0 0 1-13 13H67a13 13 0 0 1-13-13V98z"/>
+    <path stroke-width="10" d="M55 99h146"/>
+    <path stroke-width="10" d="M73 73 55 99m128-26 18 26"/>
+    <path stroke-width="10" d="M101 73 96 99m59-26 5 26"/>
+    <path stroke-width="10" d="M128 73v26"/>
+    <path stroke-width="10" d="M55 99h146v17a13 13 0 0 1-13 13h-39v-30h-42v30H68a13 13 0 0 1-13-13z"/>
+  </g>
+  <text x="128" y="169" fill="#151515" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="800" letter-spacing="2" text-anchor="middle">MKAR</text>
+</svg>
