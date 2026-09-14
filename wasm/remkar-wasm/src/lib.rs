@@ -6,9 +6,8 @@ mod writer;
 
 use crate::error::MkarError;
 use crate::model::{
-    ArchiveEntry, EncodeOptions, ManifestInput, PlannedArchiveEntry, RequestedLimits, TarOptions,
+    ArchiveEntry, EncodeOptions, ManifestInput, PlannedArchiveEntry, RequestedLimits,
 };
-use std::io::Cursor;
 use wasm_bindgen::prelude::*;
 
 pub use crate::model::{DecodeLimits, EntryKind};
@@ -124,18 +123,6 @@ pub fn encode_ar(entries: JsValue) -> Result<Vec<u8>, JsValue> {
     writer::encode_ar(&entries).map_err(to_js_error)
 }
 
-#[wasm_bindgen(js_name = encodeSevenZ)]
-pub fn encode_seven_z(entries: JsValue) -> Result<Vec<u8>, JsValue> {
-    let entries: Vec<ArchiveEntry> = deserialize(entries, "Invalid 7z entries")?;
-    writer::encode_seven_z(&entries).map_err(to_js_error)
-}
-
-#[wasm_bindgen(js_name = encodeCpio)]
-pub fn encode_cpio(entries: JsValue) -> Result<Vec<u8>, JsValue> {
-    let entries: Vec<ArchiveEntry> = deserialize(entries, "Invalid cpio entries")?;
-    writer::encode_cpio(&entries).map_err(to_js_error)
-}
-
 #[wasm_bindgen(js_name = encodeCab)]
 pub fn encode_cab(entries: JsValue) -> Result<Vec<u8>, JsValue> {
     let entries: Vec<ArchiveEntry> = deserialize(entries, "Invalid CAB entries")?;
@@ -146,69 +133,6 @@ pub fn encode_cab(entries: JsValue) -> Result<Vec<u8>, JsValue> {
 pub fn encode_lzh(entries: JsValue) -> Result<Vec<u8>, JsValue> {
     let entries: Vec<ArchiveEntry> = deserialize(entries, "Invalid LZH entries")?;
     writer::encode_lzh(&entries).map_err(to_js_error)
-}
-
-#[wasm_bindgen(js_name = encodeZip)]
-pub fn encode_zip(entries: JsValue) -> Result<Vec<u8>, JsValue> {
-    let entries: Vec<ArchiveEntry> = deserialize(entries, "Invalid ZIP entries")?;
-    writer::encode_zip(&entries).map_err(to_js_error)
-}
-
-#[wasm_bindgen(js_name = encodeTar)]
-pub fn encode_tar(entries: JsValue, options: JsValue) -> Result<Vec<u8>, JsValue> {
-    let entries: Vec<ArchiveEntry> = deserialize(entries, "Invalid tar entries")?;
-    let options: TarOptions = deserialize(options, "Invalid tar options")?;
-    writer::encode_tar(&entries, options).map_err(to_js_error)
-}
-
-#[wasm_bindgen(js_name = encodeTarGz)]
-pub fn encode_tar_gz(entries: JsValue, options: JsValue) -> Result<Vec<u8>, JsValue> {
-    let entries: Vec<ArchiveEntry> = deserialize(entries, "Invalid tar.gz entries")?;
-    let options: TarOptions = deserialize(options, "Invalid tar options")?;
-    writer::encode_tar_gz(&entries, options).map_err(to_js_error)
-}
-
-#[wasm_bindgen(js_name = compressZstd)]
-pub fn compress_zstd(input: &[u8]) -> Result<Vec<u8>, JsValue> {
-    zstd::stream::encode_all(Cursor::new(input), 11).map_err(|error| {
-        to_js_error(MkarError::new(
-            error::MkarErrorCode::InvalidEntry,
-            format!("Could not compress tar.zst payload: {error}"),
-        ))
-    })
-}
-
-#[wasm_bindgen(js_name = compressXz)]
-pub fn compress_xz(input: &[u8]) -> Result<Vec<u8>, JsValue> {
-    let mut reader = Cursor::new(input);
-    let mut output = Vec::new();
-    lzma_rs::xz_compress(&mut reader, &mut output).map_err(|error| {
-        to_js_error(MkarError::new(
-            error::MkarErrorCode::InvalidEntry,
-            format!("Could not compress tar.xz payload: {error}"),
-        ))
-    })?;
-    Ok(output)
-}
-
-#[wasm_bindgen(js_name = compressBzip2)]
-pub fn compress_bzip2(input: &[u8]) -> Result<Vec<u8>, JsValue> {
-    writer::compress_bzip2(input).map_err(to_js_error)
-}
-
-#[wasm_bindgen(js_name = compressLz4)]
-pub fn compress_lz4(input: &[u8]) -> Result<Vec<u8>, JsValue> {
-    writer::compress_lz4(input).map_err(to_js_error)
-}
-
-#[wasm_bindgen(js_name = compressLzma)]
-pub fn compress_lzma(input: &[u8]) -> Result<Vec<u8>, JsValue> {
-    writer::compress_lzma(input).map_err(to_js_error)
-}
-
-#[wasm_bindgen(js_name = compressLz)]
-pub fn compress_lz(input: &[u8]) -> Result<Vec<u8>, JsValue> {
-    writer::compress_lz(input).map_err(to_js_error)
 }
 
 #[wasm_bindgen(js_name = compressBrotli)]
@@ -270,9 +194,8 @@ fn to_js_error(error: MkarError) -> JsValue {
 
 #[cfg(test)]
 mod tests {
-    use super::{compress_brotli, compress_xz, compress_zstd};
+    use super::compress_brotli;
     use crate::model::{DecodeLimits, RequestedLimits};
-    use std::io::Cursor;
 
     #[test]
     fn caller_cannot_raise_compiled_limits() {
@@ -285,18 +208,8 @@ mod tests {
     }
 
     #[test]
-    fn tar_compressors_emit_readable_streams() {
+    fn brotli_compressor_emits_readable_stream() {
         let input = b"tar payload";
-        let zstd = compress_zstd(input).unwrap();
-        let restored = zstd::stream::decode_all(Cursor::new(zstd)).unwrap();
-        assert_eq!(restored, input);
-
-        let xz = compress_xz(input).unwrap();
-        assert_eq!(&xz[..6], b"\xfd7zXZ\x00");
-        let mut restored = Vec::new();
-        lzma_rs::xz_decompress(&mut Cursor::new(xz), &mut restored).unwrap();
-        assert_eq!(restored, input);
-
         let brotli = compress_brotli(input).unwrap();
         let restored = oxiarc_archive::BrotliReader::from_bytes(brotli)
             .unwrap()

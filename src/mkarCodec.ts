@@ -1,29 +1,19 @@
 import initWasm, {
   buildManifest,
-  compressXz,
-  compressZstd,
-  compressBzip2,
-  compressLz4,
-  compressLz,
   compressBrotli,
-  compressLzma,
   decodeArchive,
   decodeStoredEntry,
-  encodeAr,
   encodeArchive,
+  encodeAr,
   encodeCab,
-  encodeCpio,
   encodeLzh,
-  encodeSevenZ,
-  encodeTar,
-  encodeTarGz,
-  encodeZip,
   encodePlannedEntry,
   inspectEntryMetadata,
   inspectEntryProp,
   planArchive,
 } from "./generated/remkar-wasm/remkar_wasm";
 import type { FsEntry } from "./types";
+import { encodeStandardArchive, type StandardArchiveFormat } from "./libarchive";
 
 export type MkarErrorCode =
   | "INVALID_ARCHIVE"
@@ -80,9 +70,8 @@ export type MkarOutput = {
   seek?(position: number): Promise<void>;
 };
 
-export type ArchiveCompression = "xz" | "zstd";
-
 export interface MkarCodec {
+  encodeStandard?(format: StandardArchiveFormat, entries: FsEntry[], options: TarOptions): Promise<Uint8Array>;
   decode(bytes: Uint8Array, options?: MkarDecodeOptions): Promise<FsEntry[]>;
   encode(entries: FsEntry[], options?: MkarEncodeOptions): Promise<Uint8Array>;
   read?(
@@ -95,20 +84,10 @@ export interface MkarCodec {
     requestPassword: ReadPasswordRequest,
   ): Promise<FsEntry[]>;
   close?(): void;
-  compress?(bytes: Uint8Array, format: ArchiveCompression): Promise<Uint8Array>;
-  compressBzip2?(bytes: Uint8Array): Promise<Uint8Array>;
-  compressLz4?(bytes: Uint8Array): Promise<Uint8Array>;
-  compressLz?(bytes: Uint8Array): Promise<Uint8Array>;
   compressBrotli?(bytes: Uint8Array): Promise<Uint8Array>;
-  compressLzma?(bytes: Uint8Array): Promise<Uint8Array>;
   encodeAr?(entries: FsEntry[]): Promise<Uint8Array>;
   encodeCab?(entries: FsEntry[]): Promise<Uint8Array>;
-  encodeSevenZ?(entries: FsEntry[]): Promise<Uint8Array>;
-  encodeCpio?(entries: FsEntry[]): Promise<Uint8Array>;
   encodeLzh?(entries: FsEntry[]): Promise<Uint8Array>;
-  encodeZip?(entries: FsEntry[]): Promise<Uint8Array>;
-  encodeTar?(entries: FsEntry[], options: TarOptions): Promise<Uint8Array>;
-  encodeTarGz?(entries: FsEntry[], options: TarOptions): Promise<Uint8Array>;
   open?(
     file: File,
     options?: MkarDecodeOptions,
@@ -146,21 +125,10 @@ export interface MkarWasmBindings {
     content: Uint8Array,
     options: MkarEncodeOptions,
   ): Uint8Array;
-  compressXz?(bytes: Uint8Array): Uint8Array;
-  compressZstd?(bytes: Uint8Array): Uint8Array;
-  compressBzip2?(bytes: Uint8Array): Uint8Array;
-  compressLz4?(bytes: Uint8Array): Uint8Array;
-  compressLz?(bytes: Uint8Array): Uint8Array;
   compressBrotli?(bytes: Uint8Array): Uint8Array;
-  compressLzma?(bytes: Uint8Array): Uint8Array;
   encodeAr?(entries: unknown): Uint8Array;
   encodeCab?(entries: unknown): Uint8Array;
-  encodeSevenZ?(entries: unknown): Uint8Array;
-  encodeCpio?(entries: unknown): Uint8Array;
   encodeLzh?(entries: unknown): Uint8Array;
-  encodeZip?(entries: unknown): Uint8Array;
-  encodeTar?(entries: unknown, options: TarOptions): Uint8Array;
-  encodeTarGz?(entries: unknown, options: TarOptions): Uint8Array;
 }
 
 type WasmEntry = {
@@ -250,6 +218,7 @@ export function createMkarCodec(
 ): MkarCodec {
   let openContext: OpenContext | null = null;
   return {
+    encodeStandard: encodeStandardArchive,
     close() {
       openContext?.passwords.clear();
       openContext = null;
@@ -331,29 +300,9 @@ export function createMkarCodec(
       }
     },
 
-    async compress(bytes, format) {
-      try {
-        if (format === "xz") {
-          if (!bindings.compressXz)
-            throw new MkarError("tar.xz compression is unavailable");
-          return bindings.compressXz(bytes);
-        }
-        if (!bindings.compressZstd)
-          throw new MkarError("tar.zst compression is unavailable");
-        return bindings.compressZstd(bytes);
-      } catch (error) {
-        throw normalizeError(error);
-      }
-    },
-
     async encodeAr(entries) {
-      if (!bindings.encodeAr)
-        throw new MkarError("ar packaging is unavailable");
-      try {
-        return bindings.encodeAr(toArchiveEntries(entries));
-      } catch (error) {
-        throw normalizeError(error);
-      }
+      if (!bindings.encodeAr) throw new MkarError("AR packaging is unavailable");
+      return bindings.encodeAr(toArchiveEntries(entries));
     },
 
     async encodeCab(entries) {
@@ -361,46 +310,6 @@ export function createMkarCodec(
         throw new MkarError("CAB packaging is unavailable");
       try {
         return bindings.encodeCab(toArchiveEntries(entries));
-      } catch (error) {
-        throw normalizeError(error);
-      }
-    },
-
-    async encodeSevenZ(entries) {
-      if (!bindings.encodeSevenZ)
-        throw new MkarError("7z packaging is unavailable");
-      try {
-        return bindings.encodeSevenZ(toArchiveEntries(entries));
-      } catch (error) {
-        throw normalizeError(error);
-      }
-    },
-
-    async compressBzip2(bytes) {
-      if (!bindings.compressBzip2)
-        throw new MkarError("tar.bz2 compression is unavailable");
-      try {
-        return bindings.compressBzip2(bytes);
-      } catch (error) {
-        throw normalizeError(error);
-      }
-    },
-
-    async compressLz4(bytes) {
-      if (!bindings.compressLz4)
-        throw new MkarError("tar.lz4 compression is unavailable");
-      try {
-        return bindings.compressLz4(bytes);
-      } catch (error) {
-        throw normalizeError(error);
-      }
-    },
-
-    async compressLz(bytes) {
-      if (!bindings.compressLz)
-        throw new MkarError("tar.lz compression is unavailable");
-      try {
-        return bindings.compressLz(bytes);
       } catch (error) {
         throw normalizeError(error);
       }
@@ -416,62 +325,11 @@ export function createMkarCodec(
       }
     },
 
-    async compressLzma(bytes) {
-      if (!bindings.compressLzma)
-        throw new MkarError("tar.lzma compression is unavailable");
-      try {
-        return bindings.compressLzma(bytes);
-      } catch (error) {
-        throw normalizeError(error);
-      }
-    },
-
-
-    async encodeCpio(entries) {
-      if (!bindings.encodeCpio)
-        throw new MkarError("cpio packaging is unavailable");
-      try {
-        return bindings.encodeCpio(toArchiveEntries(entries));
-      } catch (error) {
-        throw normalizeError(error);
-      }
-    },
-
     async encodeLzh(entries) {
       if (!bindings.encodeLzh)
         throw new MkarError("LZH packaging is unavailable");
       try {
         return bindings.encodeLzh(toArchiveEntries(entries));
-      } catch (error) {
-        throw normalizeError(error);
-      }
-    },
-
-    async encodeZip(entries) {
-      if (!bindings.encodeZip)
-        throw new MkarError("ZIP packaging is unavailable");
-      try {
-        return bindings.encodeZip(toArchiveEntries(entries));
-      } catch (error) {
-        throw normalizeError(error);
-      }
-    },
-
-    async encodeTar(entries, options) {
-      if (!bindings.encodeTar)
-        throw new MkarError("tar packaging is unavailable");
-      try {
-        return bindings.encodeTar(toArchiveEntries(entries), options);
-      } catch (error) {
-        throw normalizeError(error);
-      }
-    },
-
-    async encodeTarGz(entries, options) {
-      if (!bindings.encodeTarGz)
-        throw new MkarError("tar.gz packaging is unavailable");
-      try {
-        return bindings.encodeTarGz(toArchiveEntries(entries), options);
       } catch (error) {
         throw normalizeError(error);
       }
@@ -1129,21 +987,9 @@ export function loadMkarCodec(): Promise<MkarCodec> {
         buildManifest,
         planArchive,
         encodePlannedEntry,
-        compressXz,
-        compressZstd,
-        compressBzip2,
-        compressLz4,
-        compressLz,
         compressBrotli,
-        compressLzma,
-        encodeAr,
         encodeCab,
-        encodeSevenZ,
-        encodeCpio,
         encodeLzh,
-        encodeZip,
-        encodeTar,
-        encodeTarGz,
       }),
     );
   }

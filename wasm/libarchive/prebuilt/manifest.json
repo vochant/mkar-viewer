@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "sourceSha256": "357cee768c29ab5d3a647159dc0bbe2e5cf04ba4c4fb5e8dfc9f91f6635c22a8",
+  "files": {
+    "libarchive.mjs": "95cada4acfd3a0eb1597893714f543c2879734737014df7d125921699e20b80c",
+    "libarchive.wasm": "91d4b67be82de2f7797dc46874567f8c77e94adde2d0eb89ed526312ecf263ba",
+    "NOTICE.txt": "a7cc8739ff764bf62dfadcd042e69ae26de105e3b0f4b3b75d65161ec0eac727"
+  },
+  "toolchain": "Emscripten 5.0.2",
+  "libarchive": "3.8.9",
+  "provenance": "Pinned sources compiled externally; writer.c uses strict symbols, dynamic output, explicit filter selection and unpadded final blocks."
+}

@@ -50,6 +50,8 @@ const FORMAT_OPTIONS: ArchiveFormat[] = [
   "mkar",
   "zip",
   "7z",
+  "xar",
+  "tar.Z",
   "tar.gz",
   "tar.bz2",
   "tar.xz",
@@ -818,6 +820,7 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
         }),
       );
       const tarFormats = new Set<ArchiveFormat>([
+        "tar.Z",
         "tar",
         "tar.gz",
         "tar.bz2",

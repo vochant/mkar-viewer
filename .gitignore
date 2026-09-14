@@ -2,6 +2,10 @@ node_modules/
 dist/
 *.tsbuildinfo
 src/generated/remkar-wasm/
+src/generated/libarchive/
+*.wasm
+*.tgz
+*.tar.gz
 wasm/remkar-wasm/target/
 .vercel
 .env*

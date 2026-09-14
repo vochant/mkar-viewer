@@ -112,6 +112,8 @@ describe("MKAR lifecycle", () => {
       ".mkar",
       ".zip",
       ".7z",
+      ".xar",
+      ".tar.Z",
       ".tar.gz",
       ".tar.bz2",
       ".tar.xz",
@@ -345,11 +347,11 @@ describe("MKAR lifecycle", () => {
 
   it("exports only checked entries when a partial selection is made", async () => {
     const encode = vi.fn(async () => new Uint8Array([1, 2, 3]));
-    const encodeZip = vi.fn(async () => new Uint8Array([80, 75, 3, 4]));
+    const encodeStandard = vi.fn(async () => new Uint8Array([80, 75, 3, 4]));
     const codec: MkarCodec = {
       decode: async () => [],
       encode,
-      encodeZip,
+      encodeStandard,
     };
     const createObjectUrl = vi
       .spyOn(URL, "createObjectURL")
@@ -375,9 +377,9 @@ describe("MKAR lifecycle", () => {
     await user.click(screen.getByRole("button", { name: "Export selection" }));
 
     expect(encode).not.toHaveBeenCalled();
-    expect(encodeZip).toHaveBeenCalledWith([
+    expect(encodeStandard).toHaveBeenCalledWith("zip", [
       expect.objectContaining({ path: "a.txt" }),
-    ]);
+    ], { variant: "gnu" });
     expect(screen.getByText("a.txt")).toBeTruthy();
     expect(screen.getByText("b.txt")).toBeTruthy();
     createObjectUrl.mockRestore();
@@ -386,10 +388,10 @@ describe("MKAR lifecycle", () => {
   });
 
   it("uses the save dialog for non-MKAR exports when available", async () => {
-    const encodeZip = vi.fn(async () => new Uint8Array([80, 75, 3, 4]));
+    const encodeStandard = vi.fn(async () => new Uint8Array([80, 75, 3, 4]));
     const write = vi.fn(async () => undefined);
     const close = vi.fn(async () => undefined);
-    const codec: MkarCodec = { decode: async () => [], encode: async () => new Uint8Array(), encodeZip };
+    const codec: MkarCodec = { decode: async () => [], encode: async () => new Uint8Array(), encodeStandard };
     const showSaveFilePicker = vi.fn(async () => ({
       createWritable: async () => ({
         write,
@@ -419,18 +421,18 @@ describe("MKAR lifecycle", () => {
     expect(showSaveFilePicker).toHaveBeenCalledWith({
       suggestedName: "untitled.zip",
     });
-    expect(encodeZip).toHaveBeenCalled();
+    expect(encodeStandard).toHaveBeenCalled();
     expect(write).toHaveBeenCalledWith(expect.any(Blob));
     expect(close).toHaveBeenCalled();
     delete (window as Window & { showSaveFilePicker?: unknown }).showSaveFilePicker;
   });
 
   it("rebases selected entries to the current directory", async () => {
-    const encodeZip = vi.fn(async () => new Uint8Array([80, 75, 3, 4]));
+    const encodeStandard = vi.fn(async () => new Uint8Array([80, 75, 3, 4]));
     const codec: MkarCodec = {
       decode: async () => [],
       encode: async () => new Uint8Array(),
-      encodeZip,
+      encodeStandard,
       open: async () => [
         { id: "a", name: "a", path: "a", kind: "folder" },
         { id: "b", name: "b", path: "a/b", kind: "folder" },
@@ -458,10 +460,10 @@ describe("MKAR lifecycle", () => {
     );
     await user.click(screen.getByRole("button", { name: "Export selection" }));
 
-    expect(encodeZip).toHaveBeenCalledWith([
+    expect(encodeStandard).toHaveBeenCalledWith("zip", [
       expect.objectContaining({ path: "c" }),
       expect.objectContaining({ path: "d" }),
-    ]);
+    ], { variant: "gnu" });
   });
 
   it("downloads a file without passing it through an archive encoder", async () => {
@@ -498,11 +500,11 @@ describe("MKAR lifecycle", () => {
   });
 
   it("exports a directory's contents using the selected format and its name", async () => {
-    const encodeZip = vi.fn(async () => new Uint8Array([80, 75, 3, 4]));
+    const encodeStandard = vi.fn(async () => new Uint8Array([80, 75, 3, 4]));
     const codec: MkarCodec = {
       decode: async () => [],
       encode: async () => new Uint8Array(),
-      encodeZip,
+      encodeStandard,
       open: async () => [
         { id: "a", name: "a", path: "a", kind: "folder" },
         { id: "b", name: "b", path: "a/b", kind: "folder" },
@@ -534,10 +536,10 @@ describe("MKAR lifecycle", () => {
     await user.click(screen.getByRole("button", { name: "Download b/" }));
 
     expect(downloads).toContain("b.zip");
-    expect(encodeZip).toHaveBeenCalledWith([
+    expect(encodeStandard).toHaveBeenCalledWith("zip", [
       expect.objectContaining({ path: "c" }),
       expect.objectContaining({ path: "d" }),
-    ]);
+    ], { variant: "gnu" });
     expect(screen.getByTitle("a")).toBeTruthy();
   });
 

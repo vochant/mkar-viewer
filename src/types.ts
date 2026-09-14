@@ -29,6 +29,8 @@ export type ArchiveFormat =
   | "cab"
   | "lzh"
   | "zip"
+  | "xar"
+  | "tar.Z"
   | "tar.gz"
   | "tar.bz2"
   | "tar.xz"

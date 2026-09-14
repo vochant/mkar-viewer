@@ -194,22 +194,6 @@ pub struct CompressionAssignment {
     pub enabled: bool,
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum TarVariant {
-    #[default]
-    Gnu,
-    Pax,
-    Ustar,
-    V7,
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-pub struct TarOptions {
-    pub variant: TarVariant,
-}
-
 impl EncodeOptions {
     pub fn passwords(&self) -> Result<HashMap<u32, &str>, String> {
         let mut passwords = HashMap::new();

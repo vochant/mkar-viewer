@@ -1,0 +1,16 @@
+{
+  "emscripten": "5.0.2",
+  "repositories": {
+    "zlib": { "url": "https://github.com/madler/zlib.git", "revision": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf" },
+    "libxml2": { "url": "https://github.com/GNOME/libxml2.git", "revision": "74f3154320df8950eceae4951975cc9dfc3a254d" },
+    "mbedtls": { "url": "https://github.com/Mbed-TLS/mbedtls.git", "revision": "c765c831e5c2a0971410692f92f7a81d6ec65ec2" },
+    "libarchive": { "url": "https://github.com/libarchive/libarchive.git", "revision": "27cbc7827172698143e440801fc0ba39ccb4f1f5" },
+    "xz": { "url": "https://github.com/tukaani-project/xz.git", "revision": "4b73f2ec19a99ef465282fbce633e8deb33691b3" },
+    "lz4": { "url": "https://github.com/lz4/lz4.git", "revision": "ebb370ca83af193212df4dcbadcc5d87bc0de2f0" },
+    "zstd": { "url": "https://github.com/facebook/zstd.git", "revision": "f8745da6ff1ad1e7bab384bd1f9d742439278e99" }
+  },
+  "bzip2": {
+    "url": "https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz",
+    "sha256": "ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269"
+  }
+}

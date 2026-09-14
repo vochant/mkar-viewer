@@ -5,21 +5,16 @@ use crate::format::{
 };
 use crate::model::{
     ArchiveEntry, EncodeOptions, EntryKind, MAX_DEPTH, MAX_ENTRIES, MAX_ENTRY_BYTES,
-    MAX_NAME_BYTES, MAX_TOTAL_BYTES, PlannedArchiveEntry, TarOptions, TarVariant,
+    MAX_NAME_BYTES, MAX_TOTAL_BYTES, PlannedArchiveEntry,
 };
 use aes::Aes128;
-use bzip2::write::BzEncoder;
 use cbc::Encryptor;
 use cipher::block_padding::Pkcs7;
 use cipher::{BlockEncryptMut, KeyIvInit};
-use flate2::{Compression, GzBuilder};
-use lz4_flex::frame::FrameEncoder;
-use lzma_rust2::{LzipOptions, LzipWriter};
 use oxiarc_archive::{BrotliWriter, LzhWriter};
 use oxiarc_core::Crc16;
 use oxiarc_lzhuf::{LzhMethod, encode_lzh as compress_lzh};
 use pbkdf2::pbkdf2_hmac;
-use sevenz_rust::{SevenZArchiveEntry, SevenZWriter};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{Cursor, Write};
@@ -382,27 +377,6 @@ pub fn encode_ar(entries: &[ArchiveEntry]) -> Result<Vec<u8>, MkarError> {
         .map_err(|error| invalid_entry(format!("Could not finish ar archive: {error}")))
 }
 
-pub fn encode_cpio(entries: &[ArchiveEntry]) -> Result<Vec<u8>, MkarError> {
-    let canonical = canonical_archive_entries(entries)?;
-    let inputs = canonical.into_iter().map(|(path, (kind, data))| {
-        let mode = if kind == EntryKind::Folder {
-            0o040755
-        } else {
-            0o100644
-        };
-        (
-            cpio::NewcBuilder::new(&path)
-                .uid(0)
-                .gid(0)
-                .mode(mode)
-                .mtime(0),
-            Cursor::new(data),
-        )
-    });
-    cpio::write_cpio(inputs, Vec::new())
-        .map_err(|error| invalid_entry(format!("Could not write cpio archive: {error}")))
-}
-
 pub fn encode_cab(entries: &[ArchiveEntry]) -> Result<Vec<u8>, MkarError> {
     let files: Vec<(String, Vec<u8>)> = canonical_archive_entries(entries)?
         .into_iter()
@@ -461,146 +435,6 @@ pub fn encode_lzh(entries: &[ArchiveEntry]) -> Result<Vec<u8>, MkarError> {
     writer
         .into_inner()
         .map_err(|error| invalid_entry(format!("Could not finish LZH archive: {error}")))
-}
-
-pub fn encode_zip(entries: &[ArchiveEntry]) -> Result<Vec<u8>, MkarError> {
-    let cursor = Cursor::new(Vec::new());
-    let mut writer = zip::ZipWriter::new(cursor);
-    for (path, (kind, data)) in canonical_archive_entries(entries)? {
-        let options = zip::write::SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated)
-            .unix_permissions(if kind == EntryKind::Folder {
-                0o755
-            } else {
-                0o644
-            });
-        if kind == EntryKind::Folder {
-            writer
-                .add_directory(format!("{}/", path.trim_end_matches('/')), options)
-                .map_err(|error| invalid_entry(format!("Could not add ZIP directory: {error}")))?;
-        } else {
-            writer
-                .start_file(path, options)
-                .map_err(|error| invalid_entry(format!("Could not add ZIP file: {error}")))?;
-            writer
-                .write_all(&data)
-                .map_err(|error| invalid_entry(format!("Could not write ZIP file: {error}")))?;
-        }
-    }
-    writer
-        .finish()
-        .map(|cursor| cursor.into_inner())
-        .map_err(|error| invalid_entry(format!("Could not finish ZIP archive: {error}")))
-}
-
-pub fn encode_tar(entries: &[ArchiveEntry], options: TarOptions) -> Result<Vec<u8>, MkarError> {
-    let mut builder = tar::Builder::new(Vec::new());
-    builder.mode(tar::HeaderMode::Deterministic);
-    for (index, (path, (kind, data))) in canonical_archive_entries(entries)?.into_iter().enumerate() {
-        let mut header = match options.variant {
-            TarVariant::Gnu => tar::Header::new_gnu(),
-            TarVariant::Pax | TarVariant::Ustar => tar::Header::new_ustar(),
-            TarVariant::V7 => tar::Header::new_old(),
-        };
-        header.set_mode(if kind == EntryKind::Folder {
-            0o755
-        } else {
-            0o644
-        });
-        header.set_uid(0);
-        header.set_gid(0);
-        header.set_mtime(0);
-        header.set_entry_type(if kind == EntryKind::Folder {
-            tar::EntryType::Directory
-        } else {
-            tar::EntryType::Regular
-        });
-        header.set_size(data.len() as u64);
-        let header_path = if options.variant == TarVariant::Pax {
-            builder
-                .append_pax_extensions([("path", path.as_bytes())])
-                .map_err(|error| invalid_entry(format!("Could not write PAX path: {error}")))?;
-            format!("PaxEntry/{index}")
-        } else {
-            path
-        };
-        builder
-            .append_data(&mut header, header_path, Cursor::new(data))
-            .map_err(|error| invalid_entry(format!("Could not write tar entry: {error}")))?;
-    }
-    builder
-        .into_inner()
-        .map_err(|error| invalid_entry(format!("Could not finish tar archive: {error}")))
-}
-
-pub fn encode_tar_gz(entries: &[ArchiveEntry], options: TarOptions) -> Result<Vec<u8>, MkarError> {
-    let tar = encode_tar(entries, options)?;
-    let mut encoder = GzBuilder::new()
-        .mtime(0)
-        .write(Vec::new(), Compression::default());
-    encoder
-        .write_all(&tar)
-        .map_err(|error| invalid_entry(format!("Could not compress tar.gz: {error}")))?;
-    encoder
-        .finish()
-        .map_err(|error| invalid_entry(format!("Could not finish tar.gz: {error}")))
-}
-
-pub fn encode_seven_z(entries: &[ArchiveEntry]) -> Result<Vec<u8>, MkarError> {
-    let canonical = canonical_archive_entries(entries)?;
-    let mut writer = SevenZWriter::new(Cursor::new(Vec::new()))
-        .map_err(|error| invalid_entry(format!("Could not create 7z archive: {error}")))?;
-    writer.set_encrypt_header(false);
-    for (path, (kind, data)) in canonical {
-        let mut entry = SevenZArchiveEntry::new();
-        entry.name = path;
-        entry.is_directory = kind == EntryKind::Folder;
-        entry.has_stream = kind == EntryKind::File;
-        writer
-            .push_archive_entry(entry, (kind == EntryKind::File).then(|| Cursor::new(data)))
-            .map_err(|error| invalid_entry(format!("Could not write 7z entry: {error}")))?;
-    }
-    writer
-        .finish()
-        .map(|cursor| cursor.into_inner())
-        .map_err(|error| invalid_entry(format!("Could not finish 7z archive: {error}")))
-}
-
-pub fn compress_bzip2(input: &[u8]) -> Result<Vec<u8>, MkarError> {
-    let mut encoder = BzEncoder::new(Vec::new(), bzip2::Compression::best());
-    encoder
-        .write_all(input)
-        .map_err(|error| invalid_entry(format!("Could not compress tar.bz2: {error}")))?;
-    encoder
-        .finish()
-        .map_err(|error| invalid_entry(format!("Could not finish tar.bz2: {error}")))
-}
-
-pub fn compress_lz4(input: &[u8]) -> Result<Vec<u8>, MkarError> {
-    let mut encoder = FrameEncoder::new(Vec::new());
-    encoder
-        .write_all(input)
-        .map_err(|error| invalid_entry(format!("Could not compress tar.lz4: {error}")))?;
-    encoder
-        .finish()
-        .map_err(|error| invalid_entry(format!("Could not finish tar.lz4: {error}")))
-}
-
-pub fn compress_lzma(input: &[u8]) -> Result<Vec<u8>, MkarError> {
-    let mut output = Vec::new();
-    lzma_rs::lzma_compress(&mut Cursor::new(input), &mut output)
-        .map_err(|error| invalid_entry(format!("Could not compress tar.lzma: {error}")))?;
-    Ok(output)
-}
-
-pub fn compress_lz(input: &[u8]) -> Result<Vec<u8>, MkarError> {
-    let mut writer = LzipWriter::new(Vec::new(), LzipOptions::default());
-    writer
-        .write_all(input)
-        .map_err(|error| invalid_entry(format!("Could not compress tar.lz: {error}")))?;
-    writer
-        .finish()
-        .map_err(|error| invalid_entry(format!("Could not finish tar.lz: {error}")))
 }
 
 pub fn compress_brotli(input: &[u8]) -> Result<Vec<u8>, MkarError> {
@@ -676,8 +510,7 @@ fn limit_error(message: impl Into<String>) -> MkarError {
 #[cfg(test)]
 mod tests {
     use super::{
-        encode_ar, encode_archive_bytes, encode_cpio, encode_planned_entry, encode_tar,
-        encode_tar_gz, encode_zip, plan_archive_entries,
+        encode_archive_bytes, encode_planned_entry, plan_archive_entries,
     };
     use crate::error::MkarErrorCode;
     use crate::format::FILE_OVERHEAD;
@@ -686,7 +519,6 @@ mod tests {
         EncryptionOptions, EntryKind,
     };
     use crate::reader::{decode_stored_entry, inspect_entry_metadata};
-    use std::io::{Cursor, Read};
 
     #[test]
     fn encodes_file_and_empty_folder_as_two_roots() {
@@ -751,71 +583,6 @@ mod tests {
         let stored = encode_planned_entry(file, b"hello", &EncodeOptions::default()).unwrap();
 
         assert_eq!(stored.len(), FILE_OVERHEAD + 5);
-    }
-
-    #[test]
-    fn encodes_ar_with_extended_member_names() {
-        let bytes =
-            encode_ar(&[ArchiveEntry::file("nested/long-member-name.txt", b"hello")]).unwrap();
-
-        assert_eq!(&bytes[..8], b"!<arch>\n");
-        assert!(
-            bytes
-                .windows(b"nested/long-member-name.txt".len())
-                .any(|window| { window == b"nested/long-member-name.txt" })
-        );
-        assert!(bytes.windows(5).any(|window| window == b"hello"));
-    }
-
-    #[test]
-    fn encodes_cpio_newc_with_trailer_and_inferred_parent() {
-        let bytes = encode_cpio(&[ArchiveEntry::file("root/hello.txt", b"hello")]).unwrap();
-
-        assert_eq!(&bytes[..6], b"070701");
-        assert!(
-            bytes
-                .windows(b"root/hello.txt\0".len())
-                .any(|window| { window == b"root/hello.txt\0" })
-        );
-        assert!(
-            bytes
-                .windows(b"TRAILER!!!\0".len())
-                .any(|window| { window == b"TRAILER!!!\0" })
-        );
-    }
-
-    #[test]
-    fn standard_archive_crates_round_trip_files_and_directories() {
-        let entries = [
-            ArchiveEntry::folder("root/empty"),
-            ArchiveEntry::file("root/hello.txt", b"hello"),
-        ];
-
-        let zip_bytes = encode_zip(&entries).unwrap();
-        let mut zip = zip::ZipArchive::new(Cursor::new(zip_bytes)).unwrap();
-        assert_eq!(zip.len(), 3);
-        let mut zip_text = String::new();
-        zip.by_name("root/hello.txt")
-            .unwrap()
-            .read_to_string(&mut zip_text)
-            .unwrap();
-        assert_eq!(zip_text, "hello");
-
-        let tar_bytes = encode_tar(&entries, Default::default()).unwrap();
-        let mut tar = tar::Archive::new(Cursor::new(tar_bytes));
-        let paths = tar
-            .entries()
-            .unwrap()
-            .map(|entry| entry.unwrap().path().unwrap().to_string_lossy().to_string())
-            .collect::<Vec<_>>();
-        assert!(paths.contains(&"root/hello.txt".to_string()));
-        assert!(paths.contains(&"root/empty".to_string()));
-
-        let compressed = encode_tar_gz(&entries, Default::default()).unwrap();
-        let mut decoder = flate2::read::GzDecoder::new(compressed.as_slice());
-        let mut decoded_tar = Vec::new();
-        decoder.read_to_end(&mut decoded_tar).unwrap();
-        assert_eq!(decoded_tar, encode_tar(&entries, Default::default()).unwrap());
     }
 
     #[test]
