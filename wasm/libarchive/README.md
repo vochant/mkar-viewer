@@ -22,7 +22,7 @@ npm run build
 npm run libarchive:rebuild
 ```
 
-此命令默认构建 `wasm/libarchive/Dockerfile`，在固定的 `emscripten/emsdk:5.0.2` 环境中下载 `sources.json` 指定的固定 revision，运行 `build.sh`，检查静态库能力，链接严格的 C wrapper，并更新 `prebuilt/`、manifest 和许可证汇总。构建目录位于 Docker volume 和用户缓存中；源码副本、日志和 SHA-256 清单保留在外部缓存。仅调试 Docker 问题时可设置 `LIBARCHIVE_NATIVE_BUILD=1` 使用本机工具链。
+此命令默认构建 `wasm/libarchive/Dockerfile`；镜像构建阶段在固定的 `emscripten/emsdk:5.0.2` 环境中下载 `sources.json` 指定的固定 revision、编译所有依赖并生成产物。容器运行阶段只把镜像产物复制到外部缓存，再更新 `prebuilt/`、manifest 和许可证汇总。仅调试 Docker 问题时可设置 `LIBARCHIVE_NATIVE_BUILD=1` 使用本机工具链。
 
 ## 当前后端
 
