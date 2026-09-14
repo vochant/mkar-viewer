@@ -22,7 +22,7 @@ npm run build
 npm run libarchive:rebuild
 ```
 
-此命令在仓库外缓存中下载 `sources.json` 指定的固定 revision，运行 `build.sh`，检查 Emscripten 静态库能力，链接严格的 C wrapper，并更新 `prebuilt/`、manifest 和许可证汇总。构建目录必须位于仓库外；源码副本、日志和 SHA-256 清单都保留在外部目录。
+此命令默认构建 `wasm/libarchive/Dockerfile`，在固定的 `emscripten/emsdk:5.0.2` 环境中下载 `sources.json` 指定的固定 revision，运行 `build.sh`，检查静态库能力，链接严格的 C wrapper，并更新 `prebuilt/`、manifest 和许可证汇总。构建目录位于 Docker volume 和用户缓存中；源码副本、日志和 SHA-256 清单保留在外部缓存。仅调试 Docker 问题时可设置 `LIBARCHIVE_NATIVE_BUILD=1` 使用本机工具链。
 
 ## 当前后端
 
@@ -49,6 +49,4 @@ npm run build
 
 ## 构建耦合说明
 
-预构建路径不依赖调用者的 Emscripten、CMake、Ninja、Git 或网络环境；这些只在显式 `libarchive:rebuild` 时需要。重建路径仍然不是完全 hermetic：它依赖本机 emsdk 版本、宿主 Unix 工具、网络下载和固定源码 checkout，且当前没有 Dockerfile、容器 digest 或 CI 构建矩阵。`build.sh` 已固定源码 revision、bzip2 SHA-256、静态链接和严格 undefined-symbol 检查，但还应视为可复现脚本而不是可移植构建系统。
-
-如果要进一步降低环境差异，下一步应提供固定 emsdk digest 的 Dockerfile，并让 rebuild 在容器内完成；CI 只需运行该容器、校验 `prebuilt/manifest.json`，而不是在每次普通测试时编译。
+预构建路径不依赖调用者的 Emscripten、CMake、Ninja、Git 或网络环境；这些只在显式 `libarchive:rebuild` 时需要。重建路径现在通过 Docker 固定 Emscripten 和系统工具，源码 revision、bzip2 SHA-256、静态链接和严格 undefined-symbol 检查也已固定。仍未完全 hermetic：基础镜像使用 tag 而非 digest，依赖源码在构建时联网下载，Docker daemon 和 Linux 容器能力仍是前提。生产 CI 应进一步固定基础镜像 digest，并将源码 tarball checksum 也全部纳入 lock。

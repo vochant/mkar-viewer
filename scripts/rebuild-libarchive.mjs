@@ -13,12 +13,13 @@ function run(command, args, cwd = root, capture = false) {
   if (result.error || result.status !== 0) throw new Error(`${command} failed: ${result.error?.message ?? result.stderr ?? result.status}`);
   return result.stdout?.trim() ?? "";
 }
-const version = run("emcc", ["--version"], root, true);
-if (!version.split("\n")[0].includes(` ${sourceLock.emscripten} `)) {
+const useDocker = process.env.LIBARCHIVE_NATIVE_BUILD !== "1";
+const version = useDocker ? `Docker emscripten/emsdk:${sourceLock.emscripten}` : run("emcc", ["--version"], root, true);
+if (!useDocker && !version.split("\n")[0].includes(` ${sourceLock.emscripten} `)) {
   throw new Error(`libarchive requires Emscripten ${sourceLock.emscripten}; found ${version.split("\n")[0]}`);
 }
 const hash = createHash("sha256").update(version).update(run("cmake", ["--version"], root, true));
-for (const path of ["wasm/libarchive/sources.json", "wasm/libarchive/build.sh", "wasm/libarchive/writer.c"]) {
+for (const path of ["wasm/libarchive/sources.json", "wasm/libarchive/build.sh", "wasm/libarchive/writer.c", "wasm/libarchive/Dockerfile", "wasm/libarchive/rebuild-in-docker.sh"]) {
   hash.update(path).update(readFileSync(join(root, path)));
 }
 const key = hash.digest("hex");
@@ -28,6 +29,15 @@ const completed = join(cache, key);
 const names = ["libarchive.mjs", "libarchive.wasm", "NOTICE.txt"];
 if (!existsSync(join(completed, "checksums.json"))) {
   const temporary = mkdtempSync(join(cache, "build-"));
+  if (useDocker) {
+    const image = `mkar-online-libarchive:${key.slice(0, 16)}`;
+    run("docker", ["build", "--tag", image, "-f", join(root, "wasm/libarchive/Dockerfile"), root]);
+    run("docker", ["run", "--rm", "-v", `${root}:/work`, "-v", `${temporary}:/work/.build`, image]);
+    const checksums = Object.fromEntries(names.map((name) => [name, createHash("sha256").update(readFileSync(join(temporary, "artifacts", name))).digest("hex")]));
+    writeFileSync(join(temporary, "checksums.json"), JSON.stringify(checksums, null, 2));
+    writeFileSync(join(temporary, "toolchain.txt"), version);
+    renameSync(temporary, completed);
+  } else {
   const sources = join(temporary, "sources");
   mkdirSync(sources);
   for (const [name, source] of Object.entries(sourceLock.repositories)) {
@@ -44,11 +54,12 @@ if (!existsSync(join(completed, "checksums.json"))) {
   writeFileSync(join(temporary, "checksums.json"), JSON.stringify(checksums, null, 2));
   writeFileSync(join(temporary, "toolchain.txt"), version);
   renameSync(temporary, completed);
+  }
 }
 const checksums = JSON.parse(readFileSync(join(completed, "checksums.json"), "utf8"));
 for (const name of names) {
-  const source = join(completed, "build/artifacts", name);
+  const source = join(completed, useDocker ? "artifacts/" + name : "build/artifacts/" + name);
   if (createHash("sha256").update(readFileSync(source)).digest("hex") !== checksums[name]) throw new Error(`Cached ${name} failed SHA-256 verification`);
 }
-publishArtifacts(join(completed, "build/artifacts"), { toolchain: version, buildCache: key });
+publishArtifacts(join(completed, useDocker ? "artifacts" : "build/artifacts"), { toolchain: version, buildCache: key });
 prepareArtifacts();
