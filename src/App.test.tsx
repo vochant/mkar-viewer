@@ -1,0 +1,694 @@
+// @vitest-environment jsdom
+
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import App, { importedArchiveName } from "./App";
+import { MkarError, type MkarCodec } from "./mkarCodec";
+
+afterEach(() => {
+  cleanup();
+  localStorage.removeItem("mkar-language");
+});
+
+describe("MKAR lifecycle", () => {
+  it("derives the editable archive name from only the final MKAR suffix", () => {
+    expect(importedArchiveName("aaa.mkar")).toBe("aaa");
+    expect(importedArchiveName("asdfasdf.custom")).toBe("asdfasdf.custom");
+    expect(importedArchiveName("nosuffix")).toBe("nosuffix");
+    expect(importedArchiveName("a.mkar.mkar")).toBe("a.mkar");
+  });
+
+  it("starts as an empty viewer with a clear open action", async () => {
+    const codec: MkarCodec = {
+      decode: async () => [],
+      encode: async () => new Uint8Array(),
+    };
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+
+    await screen.findByText("Ready");
+
+    expect(screen.getByRole("heading", { name: "MKAR" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open MKAR" })).toBeTruthy();
+    expect(screen.getByRole("banner").textContent).toContain("MKAR");
+    expect(screen.getByRole("banner").textContent).not.toContain("Ready");
+    expect(screen.queryByText("README.md")).toBeNull();
+    expect(screen.getAllByText("No archive open").length).toBeGreaterThan(0);
+    const archiveName = screen.getByLabelText("Archive name") as HTMLInputElement;
+    expect(archiveName.value).toBe("");
+    expect(archiveName.placeholder).toBe("untitled");
+  });
+
+  it("switches interface language", async () => {
+    const codec: MkarCodec = {
+      decode: async () => [],
+      encode: async () => new Uint8Array(),
+    };
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Language" }),
+      "zh-CN",
+    );
+    expect(screen.getByRole("button", { name: "打开 MKAR" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "未打开归档" })).toBeTruthy();
+  });
+
+  it("updates the current status when the language changes", async () => {
+    const codec: MkarCodec = {
+      decode: async () => [],
+      encode: async () => new Uint8Array(),
+    };
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    await user.upload(
+      screen.getByLabelText("Add files"),
+      new File(["hello"], "hello.txt"),
+    );
+    expect(screen.getByText("1 file(s) added")).toBeTruthy();
+    expect(screen.getByRole("img", { name: "Unsaved changes" })).toBeTruthy();
+    expect(screen.getByRole("banner").textContent).not.toContain(
+      "Unsaved changes",
+    );
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Language" }),
+      "zh-CN",
+    );
+    expect(screen.getByText("已添加 1 个文件")).toBeTruthy();
+  });
+
+  it("keeps archive actions and compact export formats in the viewer toolbar", async () => {
+    const codec: MkarCodec = {
+      decode: async () => [],
+      encode: async () => new Uint8Array(),
+    };
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+
+    await screen.findByText("Ready");
+
+    const toolbar = screen.getByRole("toolbar");
+    expect(toolbar.querySelector('[aria-label="Export format"]')).toBeTruthy();
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Export selection",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(toolbar.textContent).not.toContain("Export MKAR");
+    expect(screen.getByRole("button", { name: "Export MKAR" })).toBeTruthy();
+    expect(toolbar.textContent).toContain("Open");
+    expect(toolbar.textContent).not.toContain("Export as");
+    expect(screen.queryByText("ARCHIVE VIEWER")).toBeNull();
+    expect(
+      screen.queryByText("Open an MKAR archive or add files to create one."),
+    ).toBeNull();
+    const formats = screen.getByRole("combobox", {
+      name: "Export format",
+    }) as HTMLSelectElement;
+    expect([...formats.options].map((option) => option.text)).toEqual([
+      ".mkar",
+      ".zip",
+      ".7z",
+      ".tar.gz",
+      ".tar.bz2",
+      ".tar.xz",
+      ".tar.br",
+      ".tar.zst",
+      ".tar.lz4",
+      ".tar.lzma",
+      ".tar.lz",
+      ".tar",
+      ".cab",
+      ".lzh",
+      ".cpio",
+      ".ar",
+    ]);
+  });
+
+  it("keeps existing files when MKAR decode fails", async () => {
+    const codec: MkarCodec = {
+      decode: async () => {
+        throw new MkarError("bad bytes", "INVALID_ARCHIVE");
+      },
+      encode: async () => new Uint8Array(),
+    };
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+
+    await user.upload(
+      screen.getByLabelText("Add files"),
+      new File(["keep"], "keep.txt", { type: "text/plain" }),
+    );
+
+    await user.upload(
+      screen.getByLabelText("Import mkar"),
+      new File([new Uint8Array([0])], "bad.mkar", {
+        type: "application/octet-stream",
+      }),
+    );
+
+    expect(await screen.findByText("Invalid MKAR archive")).toBeTruthy();
+    expect(screen.getByText("keep.txt")).toBeTruthy();
+  });
+
+  it("shows one folder at a time and navigates back", async () => {
+    const codec: MkarCodec = {
+      decode: async () => [
+        {
+          id: "root",
+          name: "root",
+          path: "root",
+          kind: "folder",
+        },
+        {
+          id: "nested",
+          name: "nested",
+          path: "root/nested",
+          kind: "folder",
+        },
+        {
+          id: "deep",
+          name: "deep.txt",
+          path: "root/nested/deep.txt",
+          kind: "file",
+          content: new Uint8Array([65]),
+        },
+      ],
+      encode: async () => new Uint8Array(),
+    };
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+
+    await user.upload(
+      screen.getByLabelText("Import mkar"),
+      new File([new Uint8Array([1])], "nested.mkar"),
+    );
+
+    expect(await screen.findByText("root/")).toBeTruthy();
+    expect(screen.queryByText("nested/")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "root/" }));
+    expect(await screen.findByText("nested/")).toBeTruthy();
+    expect(screen.queryByText("deep.txt")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "nested/" }));
+    expect(await screen.findByText("deep.txt")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByText("nested/")).toBeTruthy();
+    expect(screen.queryByText("deep.txt")).toBeNull();
+  });
+
+  it("uses an app dialog before clearing a modified workspace", async () => {
+    const codec: MkarCodec = {
+      decode: async () => [],
+      encode: async () => new Uint8Array(),
+    };
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+
+    await user.upload(
+      screen.getByLabelText("Add files"),
+      new File(["hello"], "hello.txt", { type: "text/plain" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+
+    expect(
+      screen.getByRole("dialog", { name: "Unsaved changes" }),
+    ).toBeTruthy();
+    expect(screen.getByText("hello.txt")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(
+      screen.queryByRole("dialog", { name: "Unsaved changes" }),
+    ).toBeNull();
+    expect(screen.getByText("hello.txt")).toBeTruthy();
+  });
+
+  it("blocks browser exit after a workspace change", async () => {
+    const codec: MkarCodec = {
+      decode: async () => [],
+      encode: async () => new Uint8Array(),
+    };
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    await user.upload(
+      screen.getByLabelText("Add files"),
+      new File(["hello"], "hello.txt", { type: "text/plain" }),
+    );
+
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("exports the whole workspace as MKAR and marks it saved", async () => {
+    const encode = vi.fn(async () => new Uint8Array([77, 75, 65, 82]));
+    const codec: MkarCodec = { decode: async () => [], encode };
+    const createObjectUrl = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:test");
+    const revokeObjectUrl = vi
+      .spyOn(URL, "revokeObjectURL")
+      .mockImplementation(() => undefined);
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    await user.upload(screen.getByLabelText("Add files"), [
+      new File(["a"], "a.txt"),
+      new File(["b"], "b.txt"),
+    ]);
+
+    await user.click(screen.getByRole("button", { name: "Export MKAR" }));
+
+    expect(encode).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ path: "a.txt" }),
+        expect.objectContaining({ path: "b.txt" }),
+      ]),
+      {},
+    );
+    expect(screen.queryByText("Unsaved")).toBeNull();
+    createObjectUrl.mockRestore();
+    revokeObjectUrl.mockRestore();
+    click.mockRestore();
+  });
+
+  it("exports imported and newly added files together", async () => {
+    const encodeTo = vi.fn<NonNullable<MkarCodec["encodeTo"]>>(
+      async (_entries, output) => {
+        await output.write(new Uint8Array([77, 75, 65, 82]));
+      },
+    );
+    const codec: MkarCodec = {
+      decode: async () => [],
+      encode: async () => new Uint8Array(),
+      open: async () => [
+        {
+          id: "old",
+          name: "old.txt",
+          path: "old.txt",
+          kind: "file",
+          content: new Uint8Array([111, 108, 100]),
+        },
+      ],
+      encodeTo,
+    };
+    const createObjectUrl = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:mixed");
+    const revokeObjectUrl = vi
+      .spyOn(URL, "revokeObjectURL")
+      .mockImplementation(() => undefined);
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+
+    await user.upload(
+      screen.getByLabelText("Import mkar"),
+      new File(["archive"], "source.mkar"),
+    );
+    await user.upload(
+      screen.getByLabelText("Add files"),
+      new File(["new"], "new.txt"),
+    );
+    await user.click(screen.getByRole("button", { name: "Export MKAR" }));
+
+    expect(encodeTo).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ path: "old.txt" }),
+        expect.objectContaining({ path: "new.txt" }),
+      ]),
+      expect.anything(),
+      {},
+      expect.any(Function),
+      expect.any(Function),
+    );
+    expect(
+      (screen.getByLabelText("Archive name") as HTMLInputElement).value,
+    ).toBe("source");
+    expect(screen.queryByText("Unsaved")).toBeNull();
+    createObjectUrl.mockRestore();
+    revokeObjectUrl.mockRestore();
+    click.mockRestore();
+  });
+
+  it("exports only checked entries when a partial selection is made", async () => {
+    const encode = vi.fn(async () => new Uint8Array([1, 2, 3]));
+    const encodeZip = vi.fn(async () => new Uint8Array([80, 75, 3, 4]));
+    const codec: MkarCodec = {
+      decode: async () => [],
+      encode,
+      encodeZip,
+    };
+    const createObjectUrl = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:selection");
+    const revokeObjectUrl = vi
+      .spyOn(URL, "revokeObjectURL")
+      .mockImplementation(() => undefined);
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    await user.upload(screen.getByLabelText("Add files"), [
+      new File(["a"], "a.txt"),
+      new File(["b"], "b.txt"),
+    ]);
+    await user.click(screen.getByRole("checkbox", { name: "Select a.txt" }));
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Export format" }),
+      "zip",
+    );
+    await user.click(screen.getByRole("button", { name: "Export selection" }));
+
+    expect(encode).not.toHaveBeenCalled();
+    expect(encodeZip).toHaveBeenCalledWith([
+      expect.objectContaining({ path: "a.txt" }),
+    ]);
+    expect(screen.getByText("a.txt")).toBeTruthy();
+    expect(screen.getByText("b.txt")).toBeTruthy();
+    createObjectUrl.mockRestore();
+    revokeObjectUrl.mockRestore();
+    click.mockRestore();
+  });
+
+  it("uses the save dialog for non-MKAR exports when available", async () => {
+    const encodeZip = vi.fn(async () => new Uint8Array([80, 75, 3, 4]));
+    const write = vi.fn(async () => undefined);
+    const close = vi.fn(async () => undefined);
+    const codec: MkarCodec = { decode: async () => [], encode: async () => new Uint8Array(), encodeZip };
+    const showSaveFilePicker = vi.fn(async () => ({
+      createWritable: async () => ({
+        write,
+        seek: vi.fn(async () => undefined),
+        close,
+        abort: vi.fn(async () => undefined),
+      }),
+    }));
+    Object.defineProperty(window, "showSaveFilePicker", {
+      configurable: true,
+      value: showSaveFilePicker,
+    });
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    await user.upload(
+      screen.getByLabelText("Add files"),
+      new File(["a"], "a.txt"),
+    );
+    await user.click(screen.getByRole("checkbox", { name: "Select a.txt" }));
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Export format" }),
+      "zip",
+    );
+    await user.click(screen.getByRole("button", { name: "Export selection" }));
+
+    expect(showSaveFilePicker).toHaveBeenCalledWith({
+      suggestedName: "untitled.zip",
+    });
+    expect(encodeZip).toHaveBeenCalled();
+    expect(write).toHaveBeenCalledWith(expect.any(Blob));
+    expect(close).toHaveBeenCalled();
+    delete (window as Window & { showSaveFilePicker?: unknown }).showSaveFilePicker;
+  });
+
+  it("rebases selected entries to the current directory", async () => {
+    const encodeZip = vi.fn(async () => new Uint8Array([80, 75, 3, 4]));
+    const codec: MkarCodec = {
+      decode: async () => [],
+      encode: async () => new Uint8Array(),
+      encodeZip,
+      open: async () => [
+        { id: "a", name: "a", path: "a", kind: "folder" },
+        { id: "b", name: "b", path: "a/b", kind: "folder" },
+        { id: "c", name: "c", path: "a/b/c", kind: "file", content: new Uint8Array([1]) },
+        { id: "d", name: "d", path: "a/b/d", kind: "file", content: new Uint8Array([2]) },
+      ],
+    };
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:selection");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    await user.upload(
+      screen.getByLabelText("Import mkar"),
+      new File([new Uint8Array([1])], "source.mkar"),
+    );
+    await user.click(screen.getByRole("button", { name: "a/" }));
+    await user.click(screen.getByRole("button", { name: "b/" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select c" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select d" }));
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Export format" }),
+      "zip",
+    );
+    await user.click(screen.getByRole("button", { name: "Export selection" }));
+
+    expect(encodeZip).toHaveBeenCalledWith([
+      expect.objectContaining({ path: "c" }),
+      expect.objectContaining({ path: "d" }),
+    ]);
+  });
+
+  it("downloads a file without passing it through an archive encoder", async () => {
+    const encode = vi.fn(async () => new Uint8Array([77, 75, 65, 82]));
+    const codec: MkarCodec = { decode: async () => [], encode };
+    const createObjectUrl = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:file");
+    const revokeObjectUrl = vi
+      .spyOn(URL, "revokeObjectURL")
+      .mockImplementation(() => undefined);
+    const downloads: string[] = [];
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        downloads.push(this.download);
+      });
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    await user.upload(
+      screen.getByLabelText("Add files"),
+      new File(["contents"], "raw.txt", { type: "text/plain" }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Download raw.txt" }));
+
+    expect(downloads).toEqual(["raw.txt"]);
+    expect(encode).not.toHaveBeenCalled();
+    expect(createObjectUrl).toHaveBeenCalledWith(expect.any(Blob));
+    createObjectUrl.mockRestore();
+    revokeObjectUrl.mockRestore();
+    click.mockRestore();
+  });
+
+  it("exports a directory's contents using the selected format and its name", async () => {
+    const encodeZip = vi.fn(async () => new Uint8Array([80, 75, 3, 4]));
+    const codec: MkarCodec = {
+      decode: async () => [],
+      encode: async () => new Uint8Array(),
+      encodeZip,
+      open: async () => [
+        { id: "a", name: "a", path: "a", kind: "folder" },
+        { id: "b", name: "b", path: "a/b", kind: "folder" },
+        { id: "c", name: "c", path: "a/b/c", kind: "file", content: new Uint8Array([1]) },
+        { id: "d", name: "d", path: "a/b/d", kind: "file", content: new Uint8Array([2]) },
+      ],
+    };
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:folder");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const downloads: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
+      function (this: HTMLAnchorElement) {
+        downloads.push(this.download);
+      },
+    );
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    await user.upload(
+      screen.getByLabelText("Import mkar"),
+      new File([new Uint8Array([1])], "source.mkar"),
+    );
+    await user.click(screen.getByRole("button", { name: "a/" }));
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Export format" }),
+      "zip",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Download b/" }));
+
+    expect(downloads).toContain("b.zip");
+    expect(encodeZip).toHaveBeenCalledWith([
+      expect.objectContaining({ path: "c" }),
+      expect.objectContaining({ path: "d" }),
+    ]);
+    expect(screen.getByTitle("a")).toBeTruthy();
+  });
+
+  it("selects every visible entry in the current folder", async () => {
+    const codec: MkarCodec = {
+      decode: async () => [],
+      encode: async () => new Uint8Array(),
+    };
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    await user.upload(screen.getByLabelText("Add files"), [
+      new File(["a"], "a.txt"),
+      new File(["b"], "b.txt"),
+    ]);
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Select all in current folder" }),
+    );
+
+    expect(
+      (
+        screen.getByRole("checkbox", {
+          name: "Select a.txt",
+        }) as HTMLInputElement
+      ).checked,
+    ).toBe(true);
+    expect(
+      (
+        screen.getByRole("checkbox", {
+          name: "Select b.txt",
+        }) as HTMLInputElement
+      ).checked,
+    ).toBe(true);
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Export selection",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
+  });
+
+  it("always exports the whole archive from the title row", async () => {
+    const codec: MkarCodec = {
+      decode: async () => [
+        {
+          id: "root",
+          name: "root",
+          path: "root",
+          kind: "folder",
+        },
+        {
+          id: "child",
+          name: "child.txt",
+          path: "root/child.txt",
+          kind: "file",
+          content: new Uint8Array([1]),
+        },
+      ],
+      encode: async () => new Uint8Array([77, 75, 65, 82]),
+    };
+    const createObjectUrl = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:named");
+    const revokeObjectUrl = vi
+      .spyOn(URL, "revokeObjectURL")
+      .mockImplementation(() => undefined);
+    const downloads: string[] = [];
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        downloads.push(this.download);
+      });
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    await user.upload(
+      screen.getByLabelText("Import mkar"),
+      new File(["archive"], "a.mkar.mkar"),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Export MKAR" }));
+    await user.click(screen.getByRole("button", { name: "root/" }));
+    await user.click(screen.getByRole("button", { name: "Export MKAR" }));
+
+    expect(downloads).toEqual(["a.mkar.mkar", "a.mkar.mkar"]);
+    createObjectUrl.mockRestore();
+    revokeObjectUrl.mockRestore();
+    click.mockRestore();
+  });
+
+  it("assigns packing passwords to selected paths by key index", async () => {
+    const encode = vi.fn(async () => new Uint8Array([77, 75, 65, 82]));
+    const codec: MkarCodec = { decode: async () => [], encode };
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:encrypted");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
+      () => undefined,
+    );
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    await user.upload(
+      screen.getByLabelText("Add files"),
+      new File(["secret"], "secret.txt"),
+    );
+    await user.click(
+      screen.getByRole("checkbox", { name: "Select secret.txt" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Global settings" }));
+    await user.clear(screen.getByLabelText("Key index"));
+    await user.type(screen.getByLabelText("Key index"), "7");
+    await user.type(screen.getByLabelText("Password"), "hunter2");
+    await user.type(screen.getByLabelText("Confirm"), "hunter2");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(screen.getByLabelText("Enable encryption"));
+    await user.selectOptions(screen.getByLabelText("Default packing key"), "7");
+    await user.click(screen.getByLabelText("Encrypt directory listings"));
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+    await user.click(
+      screen.getByRole("button", { name: "Settings for secret.txt" }),
+    );
+    await user.selectOptions(
+      screen.getByLabelText("Encryption setting for secret.txt"),
+      "key",
+    );
+    await user.selectOptions(
+      screen.getByLabelText("Packing key for secret.txt"),
+      "7",
+    );
+    await user.selectOptions(
+      screen.getByLabelText("Compression setting for secret.txt"),
+      "on",
+    );
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+    await user.click(screen.getByRole("button", { name: "Export selection" }));
+
+    expect(encode).toHaveBeenCalledWith(
+      [expect.objectContaining({ path: "secret.txt" })],
+      {
+        compress: false,
+        compressionAssignments: [{ path: "secret.txt", enabled: true }],
+        encryption: {
+          enabled: true,
+          defaultKeyIndex: 7,
+          keys: [{ index: 7, password: "hunter2" }],
+          assignments: [{ path: "secret.txt", keyIndex: 7 }],
+          encryptDirectories: true,
+        },
+      },
+    );
+  });
+});

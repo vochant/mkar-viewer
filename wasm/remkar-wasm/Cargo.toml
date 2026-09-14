@@ -1,0 +1,39 @@
+[package]
+name = "remkar-wasm"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+aes = "0.8"
+ar = "0.9"
+bzip2 = "0.6"
+cab = "0.6"
+cbc = { version = "0.1", features = ["alloc"] }
+cipher = { version = "0.4", features = ["alloc"] }
+cpio = "0.4"
+flate2 = "1.0"
+getrandom = { version = "0.2", features = ["js"] }
+js-sys = "0.3"
+pbkdf2 = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_bytes = "0.11"
+serde-wasm-bindgen = "0.6"
+sha2 = "0.10"
+tar = { version = "0.4", default-features = false }
+wasm-bindgen = "0.2"
+zip = { version = "2.4", default-features = false, features = ["deflate"] }
+zstd = "0.13"
+lzma-rs = "0.3"
+lzma-rust2 = { version = "0.20", default-features = false, features = ["std", "encoder", "lzip"] }
+lz4_flex = "0.14"
+oxiarc-archive = { version = "0.4", default-features = false }
+oxiarc-core = "0.4"
+oxiarc-lzhuf = "0.4"
+sevenz-rust = "0.6"
+time = { version = "0.3", features = ["wasm-bindgen"] }
+
+[dev-dependencies]
+base64 = "0.22"

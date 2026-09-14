@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.tsbuildinfo
+src/generated/remkar-wasm/
+wasm/remkar-wasm/target/
+.vercel
+.env*
