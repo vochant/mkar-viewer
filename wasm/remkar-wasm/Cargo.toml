@@ -8,6 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 ar = "0.9"
+asar = "0.3"
 aes = "0.8"
 cab = "0.6"
 cbc = { version = "0.1", features = ["alloc"] }

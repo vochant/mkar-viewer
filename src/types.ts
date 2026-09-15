@@ -44,6 +44,7 @@ export type ArchiveFormat =
   | "tar.lzma"
   | "tar.lz"
   | "tar.br"
+  | "asar"
   | "tar"
   | "cpio"
   | "ar";

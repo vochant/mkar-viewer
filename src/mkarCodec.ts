@@ -75,6 +75,7 @@ export interface MkarCodec {
   encodeAr?(entries: FsEntry[], onProgress?: (completed: number, total: number) => void): Promise<Uint8Array>;
   encodeCab?(entries: FsEntry[], onProgress?: (completed: number, total: number) => void): Promise<Uint8Array>;
   encodeLzh?(entries: FsEntry[], onProgress?: (completed: number, total: number) => void): Promise<Uint8Array>;
+  encodeAsar?(entries: FsEntry[], onProgress?: (completed: number, total: number) => void): Promise<Uint8Array>;
   open?(
     file: File,
     options?: MkarDecodeOptions,
@@ -116,6 +117,7 @@ export interface MkarWasmBindings {
   encodeAr?(entries: unknown): Uint8Array;
   encodeCab?(entries: unknown): Uint8Array;
   encodeLzh?(entries: unknown): Uint8Array;
+  encodeAsar?(entries: unknown): Uint8Array;
 }
 
 type WasmEntry = {
@@ -320,6 +322,18 @@ export function createMkarCodec(
         throw new MkarError("LZH packaging is unavailable");
       try {
         const result = bindings.encodeLzh(toArchiveEntries(entries));
+        onProgress?.(entries.length, entries.length);
+        return result;
+      } catch (error) {
+        throw normalizeError(error);
+      }
+    },
+
+    async encodeAsar(entries, onProgress) {
+      if (!bindings.encodeAsar)
+        throw new MkarError("ASAR packaging is unavailable");
+      try {
+        const result = bindings.encodeAsar(toArchiveEntries(entries));
         onProgress?.(entries.length, entries.length);
         return result;
       } catch (error) {
@@ -976,6 +990,7 @@ export function loadMkarCodec(): Promise<MkarCodec> {
       encodeAr: (entries) => callMkarWorker("encodeAr", { entries }) as Promise<Uint8Array>,
       encodeCab: (entries) => callMkarWorker("encodeCab", { entries }) as Promise<Uint8Array>,
       encodeLzh: (entries) => callMkarWorker("encodeLzh", { entries }) as Promise<Uint8Array>,
+      encodeAsar: (entries) => callMkarWorker("encodeAsar", { entries }) as Promise<Uint8Array>,
       open: (file, options, onProgress) => callMkarWorkerWithProgress(
         "open",
         { file, options },
@@ -1025,6 +1040,7 @@ export function loadMkarCodec(): Promise<MkarCodec> {
         encodeAr: wasm.encodeAr,
         encodeCab: wasm.encodeCab,
         encodeLzh: wasm.encodeLzh,
+        encodeAsar: wasm.encodeAsar,
       });
     });
   }

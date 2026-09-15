@@ -98,7 +98,7 @@ button:disabled {
   color: #d8dde0;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
+  font-size: 12px;
   display: flex;
 }
 .topbar-actions {
@@ -118,7 +118,9 @@ button:disabled {
   background: 0 0;
   border: 0;
   padding: 4px 0;
+  min-height: 30px;
   font-size: 12px;
+  line-height: 1.25;
 }
 .about-button:hover {
   color: #fff;
@@ -131,6 +133,7 @@ button:disabled {
   min-height: 30px;
   padding: 0 24px 0 8px;
   font-size: 12px;
+  line-height: 1.25;
 }
 .dirty-dot {
   background: #d49b21;
@@ -602,6 +605,11 @@ button:disabled {
   .topbar {
     height: 48px;
     padding: 0 12px;
+  }
+  .about-button,
+  .language-picker select {
+    font-size: 12px;
+    line-height: 1.25;
   }
   .toolbar {
     margin-top: 12px;

@@ -28,7 +28,7 @@ for capability in HAVE_LIBXML_XMLWRITER_H HAVE_ZLIB_H HAVE_BZLIB_H HAVE_LZMA_H H
   grep -q "^#define $capability 1$" "$output/libarchive/config.h" || { echo "Missing required libarchive capability: $capability" >&2; exit 1; }
 done
 cmake --build "$output/libarchive" --target archive_static --parallel 4
-emcc -O3 --no-entry -DHAVE_CONFIG_H -I"$output/libarchive" -I"$prefix/include" -I"$sources/libarchive/libarchive" "$project/wasm/libarchive/writer.c" "$project/wasm/libarchive/xxencode.c" \
+emcc -O3 --no-entry -DHAVE_CONFIG_H -I"$output/libarchive" -I"$prefix/include" -I"$sources/libarchive/libarchive" "$project/wasm/libarchive/writer.c" "$project/wasm/libarchive/xxencode.c" "$project/wasm/libarchive/shar.c" \
   "$output/libarchive/libarchive/libarchive.a" "$prefix/lib/libxml2.a" "$prefix/lib/libz.a" "$prefix/lib/libbz2.a" "$prefix/lib/liblzma.a" "$prefix/lib/liblz4.a" "$prefix/lib/libzstd.a" "$prefix/lib/libmbedcrypto.a" \
   -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=web,worker,node -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=1073741824 -sWASM_BIGINT=1 -sERROR_ON_UNDEFINED_SYMBOLS=1 -sEXPORTED_RUNTIME_METHODS='["cwrap","HEAPU8"]' -sEXPORTED_FUNCTIONS='["_malloc","_free","_la_create","_la_add","_la_finish","_la_error","_la_data","_la_size","_la_free"]' -o "$output/artifacts/libarchive.mjs"
 find "$sources" -maxdepth 3 -type f \( -name 'COPYING*' -o -name 'LICENSE*' -o -name 'LICENCE*' \) -not -path '*/.git/*' -print0 | sort -z | while IFS= read -r -d '' license; do relative_license=${license#"$sources/"}; printf '\n===== %s =====\n' "$relative_license"; cat "$license"; done > "$output/artifacts/NOTICE.txt"

@@ -1,4 +1,5 @@
 mod error;
+mod asar_archive;
 mod format;
 mod model;
 mod reader;
@@ -135,6 +136,12 @@ pub fn encode_lzh(entries: JsValue) -> Result<Vec<u8>, JsValue> {
     writer::encode_lzh(&entries).map_err(to_js_error)
 }
 
+#[wasm_bindgen(js_name = encodeAsar)]
+pub fn encode_asar(entries: JsValue) -> Result<Vec<u8>, JsValue> {
+    let entries: Vec<ArchiveEntry> = deserialize(entries, "Invalid ASAR entries")?;
+    asar_archive::encode_asar(&entries).map_err(to_js_error)
+}
+
 #[wasm_bindgen(js_name = compressBrotli)]
 pub fn compress_brotli(input: &[u8]) -> Result<Vec<u8>, JsValue> {
     writer::compress_brotli(input).map_err(to_js_error)
@@ -195,7 +202,8 @@ fn to_js_error(error: MkarError) -> JsValue {
 #[cfg(test)]
 mod tests {
     use super::compress_brotli;
-    use crate::model::{DecodeLimits, RequestedLimits};
+    use crate::{asar_archive::encode_asar, model::{ArchiveEntry, DecodeLimits, RequestedLimits}};
+    use std::path::Path;
 
     #[test]
     fn caller_cannot_raise_compiled_limits() {
@@ -216,5 +224,26 @@ mod tests {
             .decompress()
             .unwrap();
         assert_eq!(restored, input);
+    }
+
+    #[test]
+    fn asar_encoder_preserves_binary_file_contents() {
+        let binary = [0, 0xff, b'\n', 0x80];
+        let archive = encode_asar(&[
+            ArchiveEntry::folder("assets"),
+            ArchiveEntry::file("assets/data.bin", binary),
+        ])
+        .unwrap();
+        let reader = asar::AsarReader::new(&archive, None).unwrap();
+
+        assert_eq!(reader.files().get(Path::new("assets/data.bin")).unwrap().data(), binary);
+    }
+
+    #[test]
+    fn asar_encoder_omits_empty_directories_without_failing() {
+        let archive = encode_asar(&[ArchiveEntry::folder("empty")]).unwrap();
+        let reader = asar::AsarReader::new(&archive, None).unwrap();
+
+        assert!(reader.files().is_empty());
     }
 }

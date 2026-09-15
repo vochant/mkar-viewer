@@ -25,4 +25,17 @@ describe("archive backend routing", () => {
     expect(encode).toHaveBeenCalled();
     expect(codec.encodeStandard).not.toHaveBeenCalled();
   });
+  it("routes ASAR to the retained encoder", async () => {
+    const encodeAsar = vi.fn(async () => new Uint8Array([4]));
+    const codec = {
+      decode: async () => [],
+      encode: vi.fn(),
+      encodeAsar,
+      encodeStandard: vi.fn(),
+    } as MkarCodec;
+
+    expect(await encodeArchive("asar", entries, codec)).toEqual(new Uint8Array([4]));
+    expect(encodeAsar).toHaveBeenCalledWith(entries);
+    expect(codec.encodeStandard).not.toHaveBeenCalled();
+  });
 });

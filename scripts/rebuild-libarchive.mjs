@@ -19,7 +19,7 @@ if (!useDocker && !version.split("\n")[0].includes(` ${sourceLock.emscripten} `)
   throw new Error(`libarchive requires Emscripten ${sourceLock.emscripten}; found ${version.split("\n")[0]}`);
 }
 const hash = createHash("sha256").update(version).update(run("cmake", ["--version"], root, true));
-for (const path of ["wasm/libarchive/sources.json", "wasm/libarchive/build.sh", "wasm/libarchive/build-dependencies.sh", "wasm/libarchive/build-libarchive.sh", "wasm/libarchive/writer.c", "wasm/libarchive/xxencode.c", "wasm/libarchive/Dockerfile", "wasm/libarchive/rebuild-in-docker.sh"]) {
+for (const path of ["wasm/libarchive/sources.json", "wasm/libarchive/build.sh", "wasm/libarchive/build-dependencies.sh", "wasm/libarchive/build-libarchive.sh", "wasm/libarchive/writer.c", "wasm/libarchive/xxencode.c", "wasm/libarchive/shar.c", "wasm/libarchive/Dockerfile", "wasm/libarchive/rebuild-in-docker.sh"]) {
   hash.update(path).update(readFileSync(join(root, path)));
 }
 const key = hash.digest("hex");

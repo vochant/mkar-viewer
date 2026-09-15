@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App, { importedArchiveName } from "./App";
@@ -169,6 +169,7 @@ describe("MKAR lifecycle", () => {
       ".tar.b64",
       ".tar.xx",
       ".tar.br",
+      ".asar",
       ".cpio",
       ".xar",
       ".iso",
@@ -201,6 +202,7 @@ describe("MKAR lifecycle", () => {
         type: "application/octet-stream",
       }),
     );
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
 
     expect(await screen.findByText("Invalid MKAR archive")).toBeTruthy();
     expect(screen.getByText("keep.txt")).toBeTruthy();
@@ -267,15 +269,258 @@ describe("MKAR lifecycle", () => {
     );
     await user.click(screen.getByRole("button", { name: "Clear" }));
 
-    expect(
-      screen.getByRole("dialog", { name: "Unsaved changes" }),
-    ).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Confirm" })).toBeTruthy();
+    expect(screen.getByText("This action cannot be undone. Continue?")).toBeTruthy();
     expect(screen.getByText("hello.txt")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(
-      screen.queryByRole("dialog", { name: "Unsaved changes" }),
-    ).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Confirm" })).toBeNull();
     expect(screen.getByText("hello.txt")).toBeTruthy();
+  });
+
+  it("asks before clearing a non-empty imported workspace", async () => {
+    const codec: MkarCodec = {
+      decode: async () => [
+        { id: "saved", name: "saved.txt", path: "saved.txt", kind: "file", content: new Uint8Array([1]) },
+      ],
+      encode: async () => new Uint8Array(),
+    };
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    await user.upload(screen.getByLabelText("Import mkar"), new File(["archive"], "saved.mkar"));
+    expect(await screen.findByText("saved.txt")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+
+    expect(screen.getByRole("dialog", { name: "Confirm" })).toBeTruthy();
+    expect(screen.getByText("saved.txt")).toBeTruthy();
+  });
+
+  it("opens only a drag containing exactly one MKAR file", async () => {
+    const decode = vi.fn(async () => [
+      { id: "inside", name: "inside.txt", path: "inside.txt", kind: "file" as const, content: new Uint8Array([1]) },
+    ]);
+    const codec: MkarCodec = { decode, encode: async () => new Uint8Array() };
+    const { container } = render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    const archive = new File(["archive"], "one.mkar");
+
+    fireEvent.drop(container.querySelector(".app-shell") as HTMLElement, {
+      dataTransfer: {
+        files: [archive],
+        items: [{ kind: "file", getAsFile: () => archive }],
+      },
+    });
+
+    expect(await screen.findByText("inside.txt")).toBeTruthy();
+    expect(decode).toHaveBeenCalledTimes(1);
+  });
+
+  it("adds mixed and multiple MKAR drags instead of opening them", async () => {
+    const decode = vi.fn(async () => []);
+    const codec: MkarCodec = { decode, encode: async () => new Uint8Array() };
+    const { container } = render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    const first = new File(["a"], "first.mkar");
+    const second = new File(["b"], "second.mkar");
+
+    fireEvent.drop(container.querySelector(".app-shell") as HTMLElement, {
+      dataTransfer: {
+        files: [first, second],
+        items: [
+          { kind: "file", getAsFile: () => first },
+          { kind: "file", getAsFile: () => second },
+        ],
+      },
+    });
+
+    expect(await screen.findByText("first.mkar")).toBeTruthy();
+    expect(screen.getByText("second.mkar")).toBeTruthy();
+    expect(decode).not.toHaveBeenCalled();
+  });
+
+  it("adds an MKAR dragged together with a regular file", async () => {
+    const decode = vi.fn(async () => []);
+    const codec: MkarCodec = { decode, encode: async () => new Uint8Array() };
+    const { container } = render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    const archive = new File(["a"], "archive.mkar");
+    const text = new File(["b"], "note.txt");
+
+    fireEvent.drop(container.querySelector(".app-shell") as HTMLElement, {
+      dataTransfer: {
+        files: [archive, text],
+        items: [
+          { kind: "file", getAsFile: () => archive },
+          { kind: "file", getAsFile: () => text },
+        ],
+      },
+    });
+
+    expect(await screen.findByText("archive.mkar")).toBeTruthy();
+    expect(screen.getByText("note.txt")).toBeTruthy();
+    expect(decode).not.toHaveBeenCalled();
+  });
+
+  it("captures every modern file-system handle before drag data expires", async () => {
+    const codec: MkarCodec = { decode: async () => [], encode: async () => new Uint8Array() };
+    const { container } = render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    const first = new File(["a"], "first.txt");
+    const second = new File(["b"], "second.txt");
+    let dragDataReadable = true;
+    const firstHandle = {
+      kind: "file",
+      name: first.name,
+      getFile: async () => first,
+    };
+    const secondHandle = {
+      kind: "file",
+      name: second.name,
+      getFile: async () => second,
+    };
+
+    fireEvent.drop(container.querySelector(".app-shell") as HTMLElement, {
+      dataTransfer: {
+        files: [first, second],
+        items: [
+          {
+            kind: "file",
+            getAsFile: () => (dragDataReadable ? first : null),
+            getAsFileSystemHandle: () => {
+              queueMicrotask(() => {
+                dragDataReadable = false;
+              });
+              return Promise.resolve(firstHandle);
+            },
+          },
+          {
+            kind: "file",
+            getAsFile: () => (dragDataReadable ? second : null),
+            getAsFileSystemHandle: () =>
+              Promise.resolve(dragDataReadable ? secondHandle : null),
+          },
+        ],
+      },
+    });
+
+    expect(await screen.findByText("first.txt")).toBeTruthy();
+    expect(await screen.findByText("second.txt")).toBeTruthy();
+  });
+
+  it("asks before opening a dropped MKAR over a non-empty workspace", async () => {
+    const decode = vi.fn(async () => [
+      { id: "opened", name: "opened.txt", path: "opened.txt", kind: "file" as const, content: new Uint8Array([1]) },
+    ]);
+    const codec: MkarCodec = { decode, encode: async () => new Uint8Array() };
+    const user = userEvent.setup();
+    const { container } = render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    await user.upload(screen.getByLabelText("Add files"), new File(["keep"], "keep.txt"));
+    const archive = new File(["archive"], "next.mkar");
+
+    fireEvent.drop(container.querySelector(".app-shell") as HTMLElement, {
+      dataTransfer: {
+        files: [archive],
+        items: [{ kind: "file", getAsFile: () => archive }],
+      },
+    });
+
+    expect(screen.getByRole("dialog", { name: "Confirm" })).toBeTruthy();
+    expect(screen.getByText("keep.txt")).toBeTruthy();
+    expect(decode).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    expect(await screen.findByText("opened.txt")).toBeTruthy();
+    expect(screen.queryByText("keep.txt")).toBeNull();
+  });
+
+  it("recursively adds a dropped directory instead of treating it as a file", async () => {
+    const codec: MkarCodec = { decode: async () => [], encode: async () => new Uint8Array() };
+    const { container } = render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    const child = new File(["hello"], "child.txt");
+    const fileEntry = {
+      isFile: true,
+      isDirectory: false,
+      name: "child.txt",
+      file: (success: (file: File) => void) => success(child),
+    };
+    let read = false;
+    const directoryEntry = {
+      isFile: false,
+      isDirectory: true,
+      name: "folder",
+      createReader: () => ({
+        readEntries: (success: (entries: unknown[]) => void) => {
+          success(read ? [] : [fileEntry]);
+          read = true;
+        },
+      }),
+    };
+
+    fireEvent.drop(container.querySelector(".app-shell") as HTMLElement, {
+      dataTransfer: {
+        files: [],
+        items: [{ kind: "file", webkitGetAsEntry: () => directoryEntry }],
+      },
+    });
+
+    expect(await screen.findByText("folder/")).toBeTruthy();
+    fireEvent.doubleClick(screen.getByRole("button", { name: "folder/" }));
+    expect(await screen.findByText("child.txt")).toBeTruthy();
+  });
+
+  it("opens the native file and folder pickers directly", async () => {
+    const codec: MkarCodec = { decode: async () => [], encode: async () => new Uint8Array() };
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    const fileInput = screen.getByLabelText("Add files") as HTMLInputElement;
+    const folderInput = screen.getByLabelText("Add folder") as HTMLInputElement;
+    const fileClick = vi.spyOn(fileInput, "click");
+    const folderClick = vi.spyOn(folderInput, "click");
+
+    await user.click(screen.getByRole("button", { name: "Add files" }));
+    expect(fileClick).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog", { name: "Add files" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Add folder" }));
+    expect(folderClick).toHaveBeenCalledOnce();
+  });
+
+  it("preserves relative paths from the folder picker fallback", async () => {
+    const codec: MkarCodec = { decode: async () => [], encode: async () => new Uint8Array() };
+    const user = userEvent.setup();
+    render(<App codecLoader={() => Promise.resolve(codec)} />);
+    await screen.findByText("Ready");
+    const child = new File(["hello"], "child.txt");
+    Object.defineProperty(child, "webkitRelativePath", { value: "folder/child.txt" });
+
+    await user.upload(screen.getByLabelText("Add folder"), child);
+
+    expect(await screen.findByText("folder/")).toBeTruthy();
+    await user.dblClick(screen.getByRole("button", { name: "folder/" }));
+    expect(await screen.findByText("child.txt")).toBeTruthy();
+  });
+
+  it("preserves an empty folder selected through the directory picker", async () => {
+    vi.stubGlobal("showDirectoryPicker", vi.fn(async () => ({
+      kind: "directory",
+      name: "empty-folder",
+      async *values() {},
+    })));
+    try {
+      const codec: MkarCodec = { decode: async () => [], encode: async () => new Uint8Array() };
+      const user = userEvent.setup();
+      render(<App codecLoader={() => Promise.resolve(codec)} />);
+      await screen.findByText("Ready");
+
+      await user.click(screen.getByRole("button", { name: "Add folder" }));
+
+      expect(await screen.findByText("empty-folder/")).toBeTruthy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("blocks browser exit after a workspace change", async () => {

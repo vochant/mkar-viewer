@@ -32,7 +32,8 @@ export async function encodeArchive(
   if (format === "ar" && codec.encodeAr) return onProgress ? codec.encodeAr(entries, onProgress) : codec.encodeAr(entries);
   if (format === "cab" && codec.encodeCab) return onProgress ? codec.encodeCab(entries, onProgress) : codec.encodeCab(entries);
   if (format === "lzh" && codec.encodeLzh) return onProgress ? codec.encodeLzh(entries, onProgress) : codec.encodeLzh(entries);
-  if (format === "ar" || format === "cab" || format === "lzh" || !codec.encodeStandard) {
+  if (format === "asar" && codec.encodeAsar) return onProgress ? codec.encodeAsar(entries, onProgress) : codec.encodeAsar(entries);
+  if (format === "ar" || format === "cab" || format === "lzh" || format === "asar" || !codec.encodeStandard) {
     throw new Error(`${format} Wasm encoder is unavailable`);
   }
   const tarOptions = { variant: options.tarVariant ?? "gnu" };

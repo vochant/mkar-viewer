@@ -13,6 +13,7 @@ import {
   File,
   FileArchive,
   Folder,
+  FolderPlus,
   LockKeyhole,
   Plus,
   Search,
@@ -64,6 +65,7 @@ const FORMAT_OPTIONS: ArchiveFormat[] = [
   "tar.b64",
   "tar.xx",
   "tar.br",
+  "asar",
   "cpio",
   "xar",
   "iso",
@@ -72,6 +74,82 @@ const FORMAT_OPTIONS: ArchiveFormat[] = [
   "lzh",
   "ar",
 ];
+
+type IncomingEntry =
+  | { kind: "folder"; path: string }
+  | { kind: "file"; path: string; file: File };
+
+type LegacyFileSystemEntry = {
+  isFile: boolean;
+  isDirectory: boolean;
+  name: string;
+  file?: (
+    success: (file: File) => void,
+    failure?: (error: DOMException) => void,
+  ) => void;
+  createReader?: () => {
+    readEntries: (
+      success: (entries: LegacyFileSystemEntry[]) => void,
+      failure?: (error: DOMException) => void,
+    ) => void;
+  };
+};
+
+type BrowserFileSystemHandle = {
+  kind: "file" | "directory";
+  name: string;
+  getFile?: () => Promise<File>;
+  values?: () => AsyncIterableIterator<BrowserFileSystemHandle>;
+};
+
+type ExtendedDataTransferItem = DataTransferItem & {
+  getAsFileSystemHandle?: () => Promise<BrowserFileSystemHandle | null>;
+  webkitGetAsEntry?: () => LegacyFileSystemEntry | null;
+};
+
+async function readLegacyEntry(
+  entry: LegacyFileSystemEntry,
+  path = entry.name,
+): Promise<IncomingEntry[]> {
+  if (entry.isFile && entry.file) {
+    const getFile = entry.file;
+    const file = await new Promise<File>((resolve, reject) =>
+      getFile(resolve, reject),
+    );
+    return [{ kind: "file", path, file }];
+  }
+  if (!entry.isDirectory || !entry.createReader) return [];
+  const reader = entry.createReader();
+  const children: LegacyFileSystemEntry[] = [];
+  for (;;) {
+    const batch = await new Promise<LegacyFileSystemEntry[]>((resolve, reject) =>
+      reader.readEntries(resolve, reject),
+    );
+    if (!batch.length) break;
+    children.push(...batch);
+  }
+  const descendants = await Promise.all(
+    children.map((child) => readLegacyEntry(child, `${path}/${child.name}`)),
+  );
+  return [{ kind: "folder", path }, ...descendants.flat()];
+}
+
+async function readFileSystemHandle(
+  handle: BrowserFileSystemHandle,
+  path = handle.name,
+): Promise<IncomingEntry[]> {
+  if (handle.kind === "file" && handle.getFile) {
+    return [{ kind: "file", path, file: await handle.getFile() }];
+  }
+  if (handle.kind !== "directory" || !handle.values) return [];
+  const descendants: IncomingEntry[] = [];
+  for await (const child of handle.values()) {
+    descendants.push(
+      ...(await readFileSystemHandle(child, `${path}/${child.name}`)),
+    );
+  }
+  return [{ kind: "folder", path }, ...descendants];
+}
 
 function extensionFor(format: ArchiveFormat) {
   switch (format) {
@@ -433,6 +511,7 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
     status: "loading",
   });
   const inputRef = useRef<HTMLInputElement>(null);
+  const directoryRef = useRef<HTMLInputElement | null>(null);
   const archiveRef = useRef<HTMLInputElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const topbarRef = useRef<HTMLElement>(null);
@@ -658,7 +737,7 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
   };
 
   const withDiscardConfirmation = (action: () => void) => {
-    if (!dirty) {
+    if (!dirty && entries.length === 0) {
       action();
       return;
     }
@@ -666,20 +745,24 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
     setConfirmOpen(true);
   };
 
-  const addFiles = async (files: FileList | File[]) => {
-    const incoming = Array.from(files).map((file) => ({
-      id: `${file.name}-${file.lastModified}-${Math.random()}`,
-      name: file.name,
-      path: [
-        currentPath,
-        (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
-          file.name,
-      ]
-        .filter(Boolean)
-        .join("/"),
-      kind: "file" as const,
-      source: { kind: "file" as const, file },
-    }));
+  const addIncomingEntries = (items: IncomingEntry[]) => {
+    const incoming: FsEntry[] = items.map((item) => {
+      const path = [currentPath, item.path].filter(Boolean).join("/");
+      return item.kind === "folder"
+        ? {
+            id: `${path}-folder-${Math.random()}`,
+            name: entryName(path),
+            path,
+            kind: "folder",
+          }
+        : {
+            id: `${path}-${item.file.lastModified}-${Math.random()}`,
+            name: entryName(path),
+            path,
+            kind: "file",
+            source: { kind: "file", file: item.file },
+          };
+    });
     if (!incoming.length) return;
     setEntries((old) =>
       withInferredFolders([
@@ -691,7 +774,22 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
     );
     setSelectedIds(new Set());
     setDirty(true);
-    setNotice({ key: "filesAdded", vars: { count: incoming.length } });
+    setNotice({
+      key: "filesAdded",
+      vars: { count: incoming.filter((entry) => entry.kind === "file").length },
+    });
+  };
+
+  const addFiles = (files: FileList | File[]) => {
+    addIncomingEntries(
+      Array.from(files).map((file) => ({
+        kind: "file",
+        path:
+          (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
+          file.name,
+        file,
+      })),
+    );
   };
 
   const download = async (
@@ -873,10 +971,17 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
       });
       await saveBlob(`${baseName}.${extension}`, blob, saveHandle);
       if (wholeWorkspace && targetFormat === "mkar") setDirty(false);
-      setNotice({
-        key: "exportedAs",
-        vars: { name: baseName, format: targetFormat },
-      });
+      setNotice(
+        targetFormat === "asar"
+          ? {
+              key: "asarMayOmitEmptyDirectories",
+              vars: { name: baseName },
+            }
+          : {
+              key: "exportedAs",
+              vars: { name: baseName, format: targetFormat },
+            },
+      );
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       if (
@@ -970,9 +1075,81 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
     }
   };
 
+  const requestImportMkar = (file: File) => {
+    withDiscardConfirmation(() => void importMkar(file));
+  };
+
+  const addFolder = async () => {
+    const picker = (
+      window as Window & {
+        showDirectoryPicker?: () => Promise<BrowserFileSystemHandle>;
+      }
+    ).showDirectoryPicker;
+    if (!picker) {
+      directoryRef.current?.click();
+      return;
+    }
+    try {
+      const handle = await picker.call(window);
+      addIncomingEntries(await readFileSystemHandle(handle));
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setNotice({
+        text: error instanceof Error ? error.message : t("operationFailed"),
+      });
+    }
+  };
+
+  const handleDrop = async (dataTransfer: DataTransfer) => {
+    const items = Array.from(
+      dataTransfer.items ?? [],
+    ) as ExtendedDataTransferItem[];
+    const captured = items.map((item) => ({
+      kind: item.kind,
+      file:
+        item.kind === "file" && typeof item.getAsFile === "function"
+          ? item.getAsFile()
+          : null,
+      legacyEntry:
+        item.kind === "file" ? item.webkitGetAsEntry?.() ?? null : null,
+      handlePromise:
+        item.kind === "file" ? item.getAsFileSystemHandle?.() ?? null : null,
+    }));
+    if (captured.length === 1) {
+      const item = captured[0];
+      if (
+        item.file &&
+        item.legacyEntry?.isDirectory !== true &&
+        item.file.name.toLowerCase().endsWith(".mkar")
+      ) {
+        requestImportMkar(item.file);
+        return;
+      }
+    }
+
+    const incoming: IncomingEntry[] = [];
+    for (const item of captured) {
+      if (item.kind !== "file") continue;
+      const handle = await item.handlePromise;
+      if (handle) {
+        incoming.push(...(await readFileSystemHandle(handle)));
+        continue;
+      }
+      if (item.legacyEntry) {
+        incoming.push(...(await readLegacyEntry(item.legacyEntry)));
+        continue;
+      }
+      if (item.file) {
+        incoming.push({ kind: "file", path: item.file.name, file: item.file });
+      }
+    }
+    if (incoming.length) addIncomingEntries(incoming);
+    else addFiles(dataTransfer.files);
+  };
+
   const openMkar = () => {
     if (codecState.status !== "ready") return;
-    withDiscardConfirmation(() => archiveRef.current?.click());
+    archiveRef.current?.click();
   };
 
   const clearWorkspace = () => {
@@ -1264,7 +1441,12 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault();
-        void addFiles(event.dataTransfer.files);
+        void handleDrop(event.dataTransfer).catch((error) =>
+          setNotice({
+            text:
+              error instanceof Error ? error.message : t("operationFailed"),
+          }),
+        );
       }}
     >
       <header ref={topbarRef} className={`topbar${topbarCompact ? " topbar-compact" : ""}`}>
@@ -1358,6 +1540,15 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
             >
               <Plus size={17} />
               <span className="button-label">{t("add")}</span>
+            </button>
+            <button
+              className="button button-secondary"
+              onClick={() => void addFolder()}
+              disabled={busy}
+              title={t("addFolder")}
+            >
+              <FolderPlus size={17} />
+              <span className="button-label">{t("addFolder")}</span>
             </button>
             <button
               className="button button-danger"
@@ -1538,6 +1729,20 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
           }}
         />
         <input
+          ref={(element) => {
+            directoryRef.current = element;
+            element?.setAttribute("webkitdirectory", "");
+          }}
+          hidden
+          type="file"
+          multiple
+          aria-label={t("addFolder")}
+          onChange={(event) => {
+            if (event.target.files) addFiles(event.target.files);
+            event.target.value = "";
+          }}
+        />
+        <input
           ref={archiveRef}
           hidden
           type="file"
@@ -1547,12 +1752,14 @@ function AppView({ codecLoader = loadMkarCodec }: AppProps) {
           onChange={(event) => {
             const file = event.target.files?.[0];
             event.target.value = "";
-            if (file) void importMkar(file);
+            if (file) requestImportMkar(file);
           }}
         />
       </main>
       {confirmOpen && (
         <ConfirmDialog
+          title={t("confirm")}
+          confirmLabel={t("confirm")}
           message={t("confirmDiscard")}
           onCancel={() => {
             discardActionRef.current = null;

@@ -44,17 +44,21 @@ function DialogShell({
 }
 
 export function ConfirmDialog({
+  title,
+  confirmLabel,
   message,
   onCancel,
   onConfirm,
 }: {
+  title?: string;
+  confirmLabel?: string;
   message: string;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   const { t } = useI18n();
   return (
-    <DialogShell title={t("unsaved")} onClose={onCancel}>
+    <DialogShell title={title ?? t("unsaved")} onClose={onCancel}>
       <div className="dialog-body">
         <p>{message}</p>
       </div>
@@ -63,7 +67,7 @@ export function ConfirmDialog({
           {t("cancel")}
         </button>
         <button className="button button-danger-solid" onClick={onConfirm}>
-          {t("discard")}
+          {confirmLabel ?? t("discard")}
         </button>
       </footer>
     </DialogShell>

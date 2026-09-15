@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "sourceSha256": "c7e2114ef5c73341d7f6c3fb972e3ea1b43088b9801e4522db33ac89a60b4835",
+  "sourceSha256": "8933e329856d04f397c14ba7b090cd828ef1bcad55229f461b98ab49a9188e9c",
   "files": {
     "libarchive.mjs": "09fc86f876de604c785e479b2d5ed3e8a05dc7364c5ecbf726c0f56a3e4bcbdb",
-    "libarchive.wasm": "ceff89048204701b258bcc7342ce3912b98fe5809689d19883d41e9fe47aa1a3",
+    "libarchive.wasm": "1aac177209d64a33499f89985f479b28e9c79a8af9434720cf41cd7a78386125",
     "NOTICE.txt": "6c76038b4b43648113a6ad6dfbc6adf0b2f105a2863baf4b5ed10a775732ee9a"
   },
-  "toolchain": "Docker emscripten/emsdk:5.0.2",
-  "buildCache": "5274a3bde7e1a645e9a903bc21bb2bd679dfa78666c40f38818f372b4953ab47"
+  "toolchain": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 5.0.2 (dc80f645ee70178c11666de0c3860d9e064d50e4)\nCopyright (C) 2026 the Emscripten authors (see AUTHORS.txt)\nThis is free and open source software under the MIT license.\nThere is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+  "buildCache": "282494e2bbd47fdc5a0db33f64dc08279aa430f91fb00ba072231bd8fc76f48c"
 }

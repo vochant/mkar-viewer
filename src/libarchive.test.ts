@@ -61,6 +61,34 @@ describe("compiled libarchive writer", () => {
     const text = new TextDecoder().decode(bytes);
     expect(text).toContain(format === "shar" ? "#!/bin/sh" : "begin 644 -\n");
   });
+  it("writes a shar dump that restores binary files exactly", () => {
+    const bytes = writeStandardArchive(module, "shar", prepared, { variant: "gnu" });
+    const text = new TextDecoder().decode(bytes);
+    expect(text).toContain("shar_uudecode='uudecode -p'");
+    expect(text).toContain("$shar_uudecode > binary << 'SHAR_END'");
+    const path = join(directory, "binary.shar");
+    writeFileSync(path, bytes);
+    const extraction = mkdtempSync(join(tmpdir(), "mkar-shar-extract-"));
+    const result = spawnSync("sh", [path], { cwd: extraction, encoding: "utf8" });
+    expect(result.status, result.stderr).toBe(0);
+    expect(readFileSync(join(extraction, "binary"))).toEqual(binary);
+  });
+  it("preserves shar_dump quoting outside the uudecode command", () => {
+    const entries = prepareArchiveEntries([
+      { id: "quoted-dir", name: "test ' test", path: "test ' test", kind: "folder" },
+      { id: "quoted-file", name: "test ' test.txt", path: "test ' test/test ' test.txt", kind: "file", content: new TextEncoder().encode("123456\n") },
+    ]);
+    const text = new TextDecoder().decode(writeStandardArchive(module, "shar", entries, { variant: "gnu" }));
+    expect(text).toContain(
+      "echo x test\\ \\'\\ test/\n" +
+      "mkdir -p test\\ \\'\\ test/ > /dev/null 2>&1\n" +
+      "chmod 755 test\\ \\'\\ test/\n" +
+      "echo x test\\ \\'\\ test/test\\ \\'\\ test.txt\n" +
+      "$shar_uudecode > test\\ \\'\\ test/test\\ \\'\\ test.txt << 'SHAR_END'\n" +
+      "begin 644 test\\ \\'\\ test/test\\ \\'\\ test.txt\n",
+    );
+    expect(text).toContain("SHAR_END\nchmod 644 test\\ \\'\\ test/test\\ \\'\\ test.txt\nexit\n");
+  });
   it("writes xxencode with the required header newline and zero line", () => {
     const bytes = writeStandardArchive(module, "tar.xx", prepared, { variant: "gnu" });
     const text = new TextDecoder().decode(bytes);

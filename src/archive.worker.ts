@@ -7,6 +7,7 @@ import initMkar, {
   encodeAr,
   encodeCab,
   encodeLzh,
+  encodeAsar,
   encodePlannedEntry,
   inspectEntryMetadata,
   inspectEntryProp,
@@ -51,6 +52,7 @@ async function loadMkar() {
     encodeAr,
     encodeCab,
     encodeLzh,
+    encodeAsar,
   });
 }
 
@@ -126,6 +128,11 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           value = await encoder(request.entries.map(restoreEntry));
           break;
         }
+        case "encodeAsar": {
+          const request = payload as { entries: FsEntry[]; };
+          value = await codec.encodeAsar!(request.entries.map(restoreEntry));
+          break;
+        }
         case "open": {
           const request = payload as { file: File; options?: unknown };
           value = await codec.open!(request.file, request.options as never, (progress) => self.postMessage({ id, progress: { completed: progress.completed, total: progress.total } }));
@@ -173,6 +180,8 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       bytes = await (await getMkar()).encodeCab!(asFsEntries(entries));
     } else if (format === "lzh") {
       bytes = await (await getMkar()).encodeLzh!(asFsEntries(entries));
+    } else if (format === "asar") {
+      bytes = await (await getMkar()).encodeAsar!(asFsEntries(entries));
     } else if (format === "tar.br") {
       const tar = writeStandardArchive(await getLibarchive() as LibarchiveModule, "tar", entries, options, undefined, (completed, total) => self.postMessage({ id, progress: { completed, total } }));
       bytes = await (await getMkar()).compressBrotli!(tar);

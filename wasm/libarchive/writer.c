@@ -8,6 +8,7 @@
 #include <string.h>
 
 int archive_write_add_filter_xxencode(struct archive *);
+int archive_write_add_filter_shar_compat(struct archive *);
 
 struct writer {
     struct archive *archive;
@@ -72,7 +73,6 @@ static int select_filter(struct archive *archive, const char *filter) {
     return ARCHIVE_FATAL;
 }
 
-
 struct writer *la_create(const char *format, const char *filter, size_t limit) {
     if (!limit || limit > 512 * 1024 * 1024 || !setlocale(LC_ALL, "C.UTF-8")) return NULL;
     struct writer *writer = calloc(1, sizeof(*writer));
@@ -81,8 +81,11 @@ struct writer *la_create(const char *format, const char *filter, size_t limit) {
     writer->archive = archive_write_new();
     if (!writer->archive) { free(writer); return NULL; }
     if (remember(writer, archive_write_set_bytes_in_last_block(writer->archive, 1)) != ARCHIVE_OK) return writer;
-    if (remember(writer, archive_write_set_format_by_name(writer->archive, format)) != ARCHIVE_OK) return writer;
+    if (!strcmp(format, "shar")) {
+        if (remember(writer, archive_write_set_format_shar_dump(writer->archive)) != ARCHIVE_OK) return writer;
+    } else if (remember(writer, archive_write_set_format_by_name(writer->archive, format)) != ARCHIVE_OK) return writer;
     if (remember(writer, select_filter(writer->archive, filter)) != ARCHIVE_OK) return writer;
+    if (!strcmp(format, "shar") && remember(writer, archive_write_add_filter_shar_compat(writer->archive)) != ARCHIVE_OK) return writer;
     if (!strcmp(format, "zip") && remember(writer, archive_write_set_options(writer->archive, "zip:compression=deflate")) != ARCHIVE_OK) return writer;
     remember(writer, archive_write_open(writer->archive, writer, NULL, append_output, NULL));
     return writer;
